@@ -1,0 +1,26 @@
+# OS / editor skräp
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
+*.swp
+*.swo
+
+# Editor-mappar
+.vscode/
+.idea/
+
+# Tempfiler / backups
+*.bak
+*.tmp
+*.log
+
+# Node (om vi senare lägger till build-steg)
+node_modules/
+dist/
+build/
+.env
+.env.local
+
+# Anhopsade systemfiler från sparat HTML
+*_files/
