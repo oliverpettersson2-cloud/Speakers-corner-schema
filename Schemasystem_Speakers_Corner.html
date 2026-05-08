@@ -2623,26 +2623,49 @@
     border: 1px solid var(--line);
     width: 480px;
     max-width: 90vw;
-    box-shadow: 0 8px 32px rgba(43,42,38,0.25);
+    box-shadow: 0 16px 48px rgba(43,42,38,0.35);
+    border-radius: 2px;
+    overflow: hidden;
+    animation: modalIn 0.18s ease-out;
   }
   .mall-shift-modal-head {
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--line-soft);
-    background: var(--bg-paper);
+    padding: 14px 20px;
+    background: var(--ink);
+    color: var(--bg);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid var(--accent);
   }
   .mall-shift-modal-title {
     font-family: 'Fraunces', serif;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
-    color: var(--ink);
+    color: var(--bg);
+    line-height: 1.2;
   }
   .mall-shift-modal-sub {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: var(--ink-faint);
+    font-size: 9px;
+    color: rgba(244,241,234,0.6);
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-top: 4px;
+    letter-spacing: 0.1em;
+    margin-top: 2px;
+  }
+  .mall-shift-modal-close {
+    background: transparent;
+    border: 1px solid rgba(244,241,234,0.3);
+    color: var(--bg);
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .mall-shift-modal-close:hover {
+    background: var(--accent);
+    border-color: var(--accent);
   }
   .mall-shift-modal-body {
     padding: 18px 20px;
@@ -2655,32 +2678,51 @@
   }
   .mall-form-label {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: var(--ink-soft);
+    font-size: 9px;
+    color: var(--ink-faint);
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
     font-weight: 700;
   }
   .mall-form-input {
-    padding: 8px 10px;
+    padding: 10px 12px;
     border: 1px solid var(--line);
-    background: var(--bg);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
+    background: var(--bg-paper);
+    font-family: 'Fraunces', serif;
+    font-size: 14px;
     color: var(--ink);
     border-radius: 1px;
+    transition: border-color 0.15s, background 0.15s;
   }
   .mall-form-input:focus {
     outline: none;
     border-color: var(--accent);
+    background: var(--bg);
+    box-shadow: 0 0 0 2px rgba(184,65,14,0.12);
+  }
+  select.mall-form-input {
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='%232b2a26' d='M6 8L0 0h12z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+  }
+  input[type="time"].mall-form-input {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    font-weight: 600;
+    text-align: center;
+    letter-spacing: 0.04em;
   }
   .mall-form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    gap: 12px;
   }
   .mall-shift-modal-foot {
-    padding: 14px 20px;
+    padding: 12px 20px;
     border-top: 1px solid var(--line-soft);
     display: flex; justify-content: space-between; align-items: center;
     background: var(--bg-paper);
@@ -8113,8 +8155,11 @@
 <div class="mall-shift-modal-overlay" id="mallShiftModalOverlay">
   <div class="mall-shift-modal">
     <div class="mall-shift-modal-head">
-      <div class="mall-shift-modal-title" id="mallShiftModalTitle">Redigera pass</div>
-      <div class="mall-shift-modal-sub" id="mallShiftModalSub">— vecka A · måndag</div>
+      <div>
+        <div class="mall-shift-modal-title" id="mallShiftModalTitle">Redigera pass</div>
+        <div class="mall-shift-modal-sub" id="mallShiftModalSub">— vecka A · måndag</div>
+      </div>
+      <button type="button" class="mall-shift-modal-close" onclick="mallShiftModalClose()" aria-label="Stäng">×</button>
     </div>
     <div class="mall-shift-modal-body">
       <div class="mall-form-group">
