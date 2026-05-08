@@ -11062,22 +11062,23 @@ function downloadExcel() {
   summary.push([]);
   summary.push(['Inkluderar arbetsgivaravgift 31,42%, semesterersättning 12% och OB-tillägg (27,59 kr/h, +24,31 kr/h natt 01–06)']);
   
-  // Create workbook
+  // Create workbook — "Alla pass" först så användaren landar på tider direkt
   const wb = XLSX.utils.book_new();
-  
-  const wsSummary = XLSX.utils.aoa_to_sheet(summary);
-  XLSX.utils.book_append_sheet(wb, wsSummary, 'Översikt');
-  
+
   const wsShifts = XLSX.utils.json_to_sheet(rows);
   XLSX.utils.book_append_sheet(wb, wsShifts, 'Alla pass');
-  
-  // One sheet per week
+
+  // En flik per vecka för manuell granskning / utskrift
   periodWeeks.forEach(wk => {
     const wkRows = rows.filter(r => r['v.'] === wk.weekNum);
     if (wkRows.length === 0) return;
     const ws = XLSX.utils.json_to_sheet(wkRows);
     XLSX.utils.book_append_sheet(wb, ws, 'v.' + wk.weekNum);
   });
+
+  // Översikt sist — sammanfattning för referens
+  const wsSummary = XLSX.utils.aoa_to_sheet(summary);
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Översikt');
   
   const filename = `schema_${restSlug}_${periodLabel.replace(/[^\w-]/g,'')}_${yearLabel}.xlsx`;
   XLSX.writeFile(wb, filename);
