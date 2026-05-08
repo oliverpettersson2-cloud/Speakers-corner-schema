@@ -1561,6 +1561,92 @@
   .mall-shift-modal-overlay.open { display: flex; }
 
   /* ============ GENERERA-BEKRÄFTELSE MODAL ============ */
+  /* Toast-stack (in-page notiser, ersätter alert()) */
+  .toast-stack {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 3000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+    max-width: calc(100vw - 40px);
+  }
+  .toast {
+    pointer-events: auto;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--ok);
+    width: 360px;
+    max-width: 100%;
+    padding: 14px 16px;
+    box-shadow: 0 8px 28px rgba(43,42,38,0.25);
+    border-radius: 2px;
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    gap: 12px;
+    align-items: flex-start;
+    animation: toast-in 0.25s ease-out;
+  }
+  .toast.is-leaving {
+    animation: toast-out 0.2s ease-in forwards;
+  }
+  @keyframes toast-in {
+    from { transform: translateX(120%); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes toast-out {
+    from { transform: translateX(0); opacity: 1; }
+    to   { transform: translateX(120%); opacity: 0; }
+  }
+  .toast.success { border-left-color: var(--ok); }
+  .toast.warn    { border-left-color: var(--warn); }
+  .toast.error   { border-left-color: var(--err); }
+  .toast.info    { border-left-color: var(--accent); }
+  .toast-icon {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .toast.success .toast-icon { background: var(--ok); }
+  .toast.warn    .toast-icon { background: var(--warn); }
+  .toast.error   .toast-icon { background: var(--err); }
+  .toast.info    .toast-icon { background: var(--accent); }
+  .toast-body {
+    font-family: 'Fraunces', serif;
+    font-size: 14px;
+    color: var(--ink);
+    line-height: 1.4;
+  }
+  .toast-body .toast-title {
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+  .toast-body .toast-detail {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    margin-top: 4px;
+  }
+  .toast-close {
+    background: transparent;
+    border: none;
+    color: var(--ink-faint);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 2px 6px;
+    flex-shrink: 0;
+  }
+  .toast-close:hover { color: var(--ink); }
+
   /* AI-loader (visas under schemagenerering, högre z-index än alla modaler) */
   .ai-loader-overlay {
     position: fixed; inset: 0;
@@ -7305,6 +7391,9 @@
 
 </main>
 
+<!-- ============ TOAST-CONTAINER ============ -->
+<div class="toast-stack" id="toastStack"></div>
+
 <!-- ============ AI-GENERERAR LOADER ============ -->
 <div class="ai-loader-overlay" id="aiLoaderOverlay">
   <div class="ai-loader-card">
@@ -12431,10 +12520,14 @@ function confirmPicker() {
     // Om aktuella veckan hade matchande öppet pass eller vi fyllde minst en vecka, klart
     if (filledCount > 0) {
       if (applyTo !== 'this' && filledCount > 1) {
-        let msg = `${filledCount} öppna pass fyllda med ${pickerState.selectedInitials}.`;
-        if (noMatchCount > 0) msg += `\n${noMatchCount} veckor saknade motsvarande öppet pass.`;
-        if (conflictCount > 0) msg += `\n${conflictCount} veckor hoppades över (krock med befintligt pass).`;
-        setTimeout(() => alert(msg), 50);
+        const detailParts = [];
+        if (noMatchCount > 0) detailParts.push(`${noMatchCount} veckor saknade motsvarande öppet pass`);
+        if (conflictCount > 0) detailParts.push(`${conflictCount} veckor hade redan annan person`);
+        showToast({
+          title: `${filledCount} öppna pass fyllda med ${pickerState.selectedInitials}`,
+          detail: detailParts.join(' · ') || null,
+          type: conflictCount > 0 ? 'warn' : 'success',
+        });
       }
       closePicker();
       renderWeekTabs();
@@ -12480,7 +12573,11 @@ function confirmPicker() {
   });
   
   if (applyTo !== 'this' && addedCount > 1) {
-    setTimeout(() => alert(`Pass lades till i ${addedCount} veckor.${skippedCount > 0 ? ' (' + skippedCount + ' veckor hoppades över — passet fanns redan.)' : ''}`), 50);
+    showToast({
+      title: `Pass lades till i ${addedCount} veckor`,
+      detail: skippedCount > 0 ? `${skippedCount} veckor hoppades över — passet fanns redan` : null,
+      type: skippedCount > 0 ? 'warn' : 'success',
+    });
   }
   
   closePicker();
@@ -14251,6 +14348,34 @@ let mallDept = 'all'; // 'all' | 'serv' | 'kok'
 
 // =========== KOSTNAD-BANNER (kollapsbar) ===========
 let _costBannerOpen = false;
+
+// =========== TOAST ===========
+// type: 'success' | 'warn' | 'error' | 'info'
+function showToast({ title, detail, type = 'success', duration = 4500 } = {}) {
+  const stack = document.getElementById('toastStack');
+  if (!stack) return;
+  const icons = { success: '✓', warn: '!', error: '✕', info: 'i' };
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `
+    <div class="toast-icon">${icons[type] || '✓'}</div>
+    <div class="toast-body">
+      ${title ? `<div class="toast-title">${title}</div>` : ''}
+      ${detail ? `<div class="toast-detail">${detail}</div>` : ''}
+    </div>
+    <button type="button" class="toast-close" aria-label="Stäng">×</button>
+  `;
+  const closeBtn = toast.querySelector('.toast-close');
+  const dismiss = () => {
+    if (toast.classList.contains('is-leaving')) return;
+    toast.classList.add('is-leaving');
+    setTimeout(() => toast.remove(), 220);
+  };
+  closeBtn.addEventListener('click', dismiss);
+  stack.appendChild(toast);
+  if (duration > 0) setTimeout(dismiss, duration);
+  return toast;
+}
 
 // =========== AI-LOADER ===========
 function showAILoader(subText) {
