@@ -1687,7 +1687,7 @@
   }
   .gen-absence-row {
     display: grid;
-    grid-template-columns: 50px 40px 1fr auto;
+    grid-template-columns: 50px 40px 1fr auto auto;
     gap: 10px;
     align-items: center;
     padding: 6px 10px;
@@ -1695,6 +1695,85 @@
     border-left: 3px solid var(--abs-color, var(--ink-faint));
     border-radius: 1px;
     font-size: 12px;
+  }
+  .gen-absence-remove {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink-faint);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .gen-absence-remove:hover {
+    color: var(--err);
+    border-color: var(--err);
+  }
+  .gen-absence-add-btn {
+    background: transparent;
+    border: 1px dashed var(--line);
+    color: var(--accent);
+    padding: 8px 12px;
+    width: 100%;
+    margin-top: 8px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    border-radius: 1px;
+  }
+  .gen-absence-add-btn:hover {
+    background: rgba(184, 65, 14, 0.04);
+    border-color: var(--accent);
+  }
+  .gen-absence-add-form {
+    display: grid;
+    grid-template-columns: 90px 110px 1fr 1fr;
+    gap: 6px;
+    align-items: center;
+    padding: 10px;
+    background: var(--bg-paper);
+    border: 1px solid var(--accent);
+    border-radius: 1px;
+    margin-top: 8px;
+    font-size: 11px;
+  }
+  .gen-absence-add-form select,
+  .gen-absence-add-form input {
+    padding: 5px 6px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    font-family: inherit;
+    font-size: 11px;
+    border-radius: 1px;
+  }
+  .gen-absence-add-form .form-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+  .gen-absence-add-form .form-actions button {
+    padding: 5px 12px;
+    font-size: 11px;
+    cursor: pointer;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    border-radius: 1px;
+  }
+  .gen-absence-add-form .form-actions button.primary {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
   }
   .gen-absence-pill {
     font-family: 'JetBrains Mono', monospace;
@@ -13344,38 +13423,15 @@ async function bbGenerateSchedule() {
   periodEnd.setDate(periodEnd.getDate() + (weeks * 7) - 1);
   const periodEndISO = periodEnd.toISOString().slice(0,10);
 
-  let absencesInPeriod = [];
-  employees.forEach(emp => {
-    const list = getAbsencesInRange(emp, periodStartISO, periodEndISO);
-    list.forEach(a => absencesInPeriod.push({ emp, ...a }));
-  });
-
-  // Bygg HTML för registrerade frånvarotillfällen
-  let absenceListHtml = '';
-  if (absencesInPeriod.length > 0) {
-    absencesInPeriod.sort((a,b) => a.startDate.localeCompare(b.startDate));
-    absenceListHtml = absencesInPeriod.map(a => {
-      const t = ABSENCE_TYPES[a.type] || ABSENCE_TYPES.ovrigt;
-      return `<div class="gen-absence-row" style="--abs-color:${t.color};">
-        <span class="gen-absence-pill">${t.short}</span>
-        <span class="gen-absence-emp">${escapeHTML(a.emp.initials)}</span>
-        <span class="gen-absence-label">${escapeHTML(t.label)}</span>
-        <span class="gen-absence-dates">${formatAbsenceDate(a.startDate)}–${formatAbsenceDate(a.endDate)}</span>
-      </div>`;
-    }).join('');
-  } else {
-    absenceListHtml = `<div class="gen-absence-empty">Ingen frånvaro registrerad i perioden</div>`;
-  }
-
   const periodLabel = `${formatAbsenceDate(periodStartISO)} – ${formatAbsenceDate(periodEndISO)}`;
-  
-  // Visa snygg modal — returnerar Promise<bool>
+
+  // Visa snygg modal — frånvaro renderas dynamiskt så add/remove i modalen funkar
   const userConfirmed = await showGenerateConfirmModal({
     periodLabel,
     weeks,
     employeeCount: employees.length,
-    absenceListHtml,
-    absenceCount: absencesInPeriod.length,
+    periodStartISO,
+    periodEndISO,
   });
   
   if (!userConfirmed) return;
@@ -14075,17 +14131,110 @@ let _costBannerOpen = false;
 
 // =========== GENERERA-BEKRÄFTELSE MODAL ===========
 let _genModalResolver = null;
+let _genModalContext = null; // { periodStartISO, periodEndISO }
 
-function showGenerateConfirmModal({ periodLabel, weeks, employeeCount, absenceListHtml, absenceCount }) {
+function showGenerateConfirmModal({ periodLabel, weeks, employeeCount, periodStartISO, periodEndISO }) {
   return new Promise(resolve => {
     _genModalResolver = resolve;
+    _genModalContext = { periodStartISO, periodEndISO };
     document.getElementById('genModalPeriod').textContent = periodLabel;
     document.getElementById('genModalWeeks').textContent = `${weeks} veckor`;
     document.getElementById('genModalEmpCount').textContent = employeeCount;
-    document.getElementById('genModalAbsenceCount').textContent = absenceCount > 0 ? `${absenceCount} st registrerade` : '— inga registrerade';
-    document.getElementById('genModalAbsences').innerHTML = absenceListHtml;
+    genModalRefreshAbsences();
     document.getElementById('genModalOverlay').classList.add('open');
   });
+}
+
+// Bygg om frånvaro-listan från råa employees-data (anropas vid open + efter add/remove)
+function genModalRefreshAbsences() {
+  if (!_genModalContext) return;
+  const { periodStartISO, periodEndISO } = _genModalContext;
+
+  const absencesInPeriod = [];
+  employees.forEach(emp => {
+    const list = (typeof getAbsencesInRange === 'function')
+      ? getAbsencesInRange(emp, periodStartISO, periodEndISO)
+      : (emp.absences || []).filter(a => !(a.endDate < periodStartISO || a.startDate > periodEndISO));
+    list.forEach(a => absencesInPeriod.push({ emp, ...a }));
+  });
+
+  document.getElementById('genModalAbsenceCount').textContent =
+    absencesInPeriod.length > 0 ? `${absencesInPeriod.length} st registrerade` : '— inga registrerade';
+
+  let html = '';
+  if (absencesInPeriod.length > 0) {
+    absencesInPeriod.sort((a, b) => a.startDate.localeCompare(b.startDate));
+    html = absencesInPeriod.map(a => {
+      const t = ABSENCE_TYPES[a.type] || ABSENCE_TYPES.ovrigt;
+      return `<div class="gen-absence-row" style="--abs-color:${t.color};">
+        <span class="gen-absence-pill">${t.short}</span>
+        <span class="gen-absence-emp">${escapeHTML(a.emp.initials)}</span>
+        <span class="gen-absence-label">${escapeHTML(t.label)}</span>
+        <span class="gen-absence-dates">${formatAbsenceDate(a.startDate)}–${formatAbsenceDate(a.endDate)}</span>
+        <button type="button" class="gen-absence-remove" onclick="genModalRemoveAbsence('${a.emp.initials}','${a.type}','${a.startDate}','${a.endDate}')" title="Ta bort">×</button>
+      </div>`;
+    }).join('');
+  } else {
+    html = `<div class="gen-absence-empty">Ingen frånvaro registrerad i perioden</div>`;
+  }
+
+  // Add-form (initialt dold) + lägg-till-knapp
+  html += `<div id="genModalAddAbsenceForm" class="gen-absence-add-form" style="display:none;">
+    <select id="genModalNewAbsEmp">${employees.map(e =>
+      `<option value="${escapeHTML(e.initials)}">${escapeHTML(e.initials)} (${e.dept === 'serv' ? 'Servis' : 'Kök'})</option>`
+    ).join('')}</select>
+    <select id="genModalNewAbsType">${Object.entries(ABSENCE_TYPES).map(([k, v]) =>
+      `<option value="${k}">${escapeHTML(v.label)}</option>`
+    ).join('')}</select>
+    <input type="date" id="genModalNewAbsStart" value="${periodStartISO}">
+    <input type="date" id="genModalNewAbsEnd" value="${periodStartISO}">
+    <div class="form-actions">
+      <button type="button" onclick="genModalCancelAddAbsence()">Avbryt</button>
+      <button type="button" class="primary" onclick="genModalConfirmAddAbsence()">Spara frånvaro</button>
+    </div>
+  </div>
+  <button type="button" class="gen-absence-add-btn" id="genModalShowAddAbsenceBtn" onclick="genModalShowAddAbsence()">+ Lägg till frånvaro</button>`;
+
+  document.getElementById('genModalAbsences').innerHTML = html;
+}
+
+function genModalShowAddAbsence() {
+  document.getElementById('genModalAddAbsenceForm').style.display = '';
+  document.getElementById('genModalShowAddAbsenceBtn').style.display = 'none';
+}
+
+function genModalCancelAddAbsence() {
+  document.getElementById('genModalAddAbsenceForm').style.display = 'none';
+  document.getElementById('genModalShowAddAbsenceBtn').style.display = '';
+}
+
+function genModalConfirmAddAbsence() {
+  const empInitials = document.getElementById('genModalNewAbsEmp').value;
+  const type = document.getElementById('genModalNewAbsType').value;
+  const startDate = document.getElementById('genModalNewAbsStart').value;
+  const endDate = document.getElementById('genModalNewAbsEnd').value;
+
+  if (!startDate || !endDate) { alert('Fyll i båda datum.'); return; }
+  if (startDate > endDate) { alert('Slutdatum måste vara samma som eller efter startdatum.'); return; }
+
+  const emp = employees.find(e => e.initials === empInitials);
+  if (!emp) { alert('Hittade inte personen.'); return; }
+  if (!Array.isArray(emp.absences)) emp.absences = [];
+  emp.absences.push({ type, startDate, endDate });
+
+  if (typeof persistAll === 'function') persistAll();
+  genModalRefreshAbsences();
+}
+
+function genModalRemoveAbsence(initials, type, startDate, endDate) {
+  const emp = employees.find(e => e.initials === initials);
+  if (!emp || !Array.isArray(emp.absences)) return;
+  if (!confirm(`Ta bort ${type}-frånvaro för ${initials} (${startDate}–${endDate})?`)) return;
+  emp.absences = emp.absences.filter(a =>
+    !(a.type === type && a.startDate === startDate && a.endDate === endDate)
+  );
+  if (typeof persistAll === 'function') persistAll();
+  genModalRefreshAbsences();
 }
 
 function genModalResolve(confirmed) {
