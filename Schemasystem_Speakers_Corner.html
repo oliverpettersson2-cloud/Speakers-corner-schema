@@ -6484,9 +6484,6 @@
       <h1 class="page-title">Bemanningsbehov <span class="accent">— hur många, när</span></h1>
       <div class="page-sub">Servis &amp; Kök separat · justera antal med +/− · klicka cell för andra tider</div>
     </div>
-    <div style="display:flex; gap:8px;">
-      <button class="btn" onclick="bbReset()">Återställ standard</button>
-    </div>
   </div>
 
   <div class="bb-help-banner">
@@ -10143,7 +10140,7 @@ function renderRotatedSchedule() {
         let cls = `rot-shift dept-${emp.dept}`;
         if (dur > 13) {
           cls += ' very-long has-warn';
-          longShifts.push(`${emp.initials} (${DEPT_INFO[emp.dept].label}) ${dayNames[d]}: ${myShift.s}–${myShift.e} (${dur.toFixed(1)}h)`);
+          longShifts.push(`${emp.initials} (${(DEPT_INFO[emp.dept] || {}).label || emp.dept || '—'}) ${dayNames[d]}: ${myShift.s}–${myShift.e} (${dur.toFixed(1)}h)`);
         } else if (dur >= 10) {
           cls += ' long';
         }
@@ -14200,7 +14197,12 @@ async function bbGenerateSchedule() {
   } catch (err) {
     hideAILoader();
     console.error('FEL i generateSchedulesForPeriod:', err);
-    alert('Kunde inte generera schema:\n\n' + (err.message || err) + '\n\nÖppna utvecklarverktyg (F12) för full stack trace.');
+    showToast({
+      title: 'Kunde inte generera schema',
+      detail: (err.message || String(err)) + ' · F12 för stack trace',
+      type: 'error',
+      duration: 8000,
+    });
     return;
   }
 
@@ -14210,7 +14212,12 @@ async function bbGenerateSchedule() {
   hideAILoader();
   
   if (!result || !result.weeklyShifts) {
-    alert('Algoritmen returnerade inget resultat. Kontrollera att veckomallen har pass.');
+    showToast({
+      title: 'Inget resultat från algoritmen',
+      detail: 'Kontrollera att veckomallen har pass',
+      type: 'error',
+      duration: 6000,
+    });
     return;
   }
 
@@ -14262,7 +14269,12 @@ async function bbGenerateSchedule() {
     });
   } catch (err) {
     console.error('FEL i post-algoritm:', err);
-    alert('Schemat genererades men kunde inte sparas korrekt:\n\n' + (err.message || err));
+    showToast({
+      title: 'Schemat genererades men kunde inte sparas',
+      detail: err.message || String(err),
+      type: 'error',
+      duration: 8000,
+    });
     return;
   }
 
@@ -14271,7 +14283,12 @@ async function bbGenerateSchedule() {
     goStep(4);
   } catch (err) {
     console.error('FEL i goStep(4):', err);
-    alert('Schemat genererades men kunde inte visas:\n\n' + (err.message || err));
+    showToast({
+      title: 'Schemat genererades men kunde inte visas',
+      detail: err.message || String(err),
+      type: 'error',
+      duration: 8000,
+    });
     return;
   }
 
