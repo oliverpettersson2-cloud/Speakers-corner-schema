@@ -8408,6 +8408,10 @@
             <span class="ep-pref-label">★ Endast helger</span>
           </label>
           <label class="ep-pref-check">
+            <input type="checkbox" id="epPrefEveryOtherWeekend" onchange="epUpdatePrefsMeta()">
+            <span class="ep-pref-label">⇄ Varannan helg</span>
+          </label>
+          <label class="ep-pref-check">
             <input type="checkbox" id="epPrefFewShifts" onchange="epUpdatePrefsMeta()">
             <span class="ep-pref-label">◯ Bara enstaka pass/v</span>
           </label>
@@ -8702,9 +8706,9 @@ const ABSENCE_TYPES = {
 // Mjuka värden som påverkar algoritmen via soft-points men inte är hårda regler
 // (utom 'noSolo' som är hård — samma som canWorkAlone)
 //
-// Preferences-objekt på emp: { prefersDay, prefersEvening, avoidWeekend, avoidDays:[], 
-//                              noCloseAndOpen, fixedFreeDay:null|0-6, weekendsOnly, 
-//                              fewShiftsPerWeek }
+// Preferences-objekt på emp: { prefersDay, prefersEvening, avoidWeekend, avoidDays:[],
+//                              noCloseAndOpen, fixedFreeDay:null|0-6, weekendsOnly,
+//                              everyOtherWeekend, fewShiftsPerWeek }
 const PREFERENCE_TYPES = {
   prefersDay:        { label: 'Föredrar dagpass',         short: 'DAG',     emoji: '☼', soft: true },
   prefersEvening:    { label: 'Föredrar kvällspass',      short: 'KVÄLL',   emoji: '☾', soft: true },
@@ -8713,6 +8717,7 @@ const PREFERENCE_TYPES = {
   noCloseAndOpen:    { label: 'Inte stäng + öppna nästa', short: 'EJ S+Ö',  emoji: '⤿', soft: true },
   fixedFreeDay:      { label: 'Stadig ledig dag',         short: 'LEDIG',   emoji: '◷', soft: true, hasValue: true },
   weekendsOnly:      { label: 'Endast helger',            short: 'BARA HELG', emoji: '★', soft: true },
+  everyOtherWeekend: { label: 'Varannan helg',            short: '½ HELG',  emoji: '⇄', soft: true },
   fewShiftsPerWeek:  { label: 'Bara enstaka pass/v',      short: 'FÅ PASS', emoji: '◯', soft: true },
 };
 
@@ -9404,6 +9409,7 @@ function renderPersonnel() {
               if (prefs.prefersEvening) badges.push({ short: 'KVÄLL', title: 'Föredrar kvällspass' });
               if (prefs.avoidWeekend) badges.push({ short: 'EJ HELG', title: 'Helst inte helg' });
               if (prefs.weekendsOnly) badges.push({ short: 'BARA HELG', title: 'Endast helger' });
+              if (prefs.everyOtherWeekend) badges.push({ short: '½ HELG', title: 'Varannan helg' });
               if (prefs.noCloseAndOpen) badges.push({ short: 'EJ S+Ö', title: 'Inte stäng + öppna nästa dag' });
               if (typeof prefs.fixedFreeDay === 'number') {
                 badges.push({ short: `LEDIG ${SVE_DAYS_SHORT[prefs.fixedFreeDay]}`, title: `Stadig ledig ${SVE_DAYS_FULL[prefs.fixedFreeDay].toLowerCase()}` });
@@ -9654,6 +9660,8 @@ function epLoadPreferences(emp) {
   document.getElementById('epPrefAvoidWeekend').checked = !!prefs.avoidWeekend;
   document.getElementById('epPrefNoCloseAndOpen').checked = !!prefs.noCloseAndOpen;
   document.getElementById('epPrefWeekendsOnly').checked = !!prefs.weekendsOnly;
+  const eowEl = document.getElementById('epPrefEveryOtherWeekend');
+  if (eowEl) eowEl.checked = !!prefs.everyOtherWeekend;
   document.getElementById('epPrefFewShifts').checked = !!prefs.fewShiftsPerWeek;
   
   // Stadig ledig dag
@@ -9706,6 +9714,8 @@ function epCollectPreferences() {
   if (document.getElementById('epPrefAvoidWeekend').checked) prefs.avoidWeekend = true;
   if (document.getElementById('epPrefNoCloseAndOpen').checked) prefs.noCloseAndOpen = true;
   if (document.getElementById('epPrefWeekendsOnly').checked) prefs.weekendsOnly = true;
+  const eowEl = document.getElementById('epPrefEveryOtherWeekend');
+  if (eowEl && eowEl.checked) prefs.everyOtherWeekend = true;
   if (document.getElementById('epPrefFewShifts').checked) prefs.fewShiftsPerWeek = true;
   if (document.getElementById('epPrefFixedFreeDay').checked) {
     prefs.fixedFreeDay = parseInt(document.getElementById('epPrefFixedFreeDayValue').value);
@@ -14274,33 +14284,40 @@ function inferSlotDept(suggestedInitials) {
 // Räkna soft-points för en kandidat på ett pass — högre = bättre matchning av önskemål
 // Returnerar negativt tal om kandidat går EMOT preferenser (algoritmen försöker undvika)
 // Hård regel: noSolo hanteras separat i isAvailable, inte här
-function calcPreferenceScore(emp, slot, dayIdx, weekShifts) {
+function calcPreferenceScore(emp, slot, dayIdx, weekShifts, weekIdx) {
   const prefs = emp.preferences;
   if (!prefs) return 0;
-  
+
   let score = 0;
-  
+
   // Bestäm om passet är dagpass eller kvällspass
   // Heuristik: börjar pass före 14:00 = dag, börjar 14:00+ = kväll
   const startHour = parseInt(slot.s.split(':')[0]);
   const isDayShift = startHour < 14;
   const isEveningShift = startHour >= 14;
-  
+
   // Föredrar dagpass
   if (prefs.prefersDay && isDayShift) score += 3;
   if (prefs.prefersDay && isEveningShift) score -= 2;
-  
+
   // Föredrar kvällspass
   if (prefs.prefersEvening && isEveningShift) score += 3;
   if (prefs.prefersEvening && isDayShift) score -= 2;
-  
+
   // Helst inte helg (lör=5, sön=6)
   const isWeekend = dayIdx === 5 || dayIdx === 6;
   if (prefs.avoidWeekend && isWeekend) score -= 4;
-  
+
   // Endast helger
   if (prefs.weekendsOnly && !isWeekend) score -= 5;
   if (prefs.weekendsOnly && isWeekend) score += 2;
+
+  // Varannan helg — udda veckor (1, 3, 5, ...) är "av-helger"
+  // Park: weekIdx 0 = jobb-helg, 1 = av-helg, 2 = jobb-helg, ...
+  if (prefs.everyOtherWeekend && isWeekend && typeof weekIdx === 'number') {
+    if (weekIdx % 2 === 1) score -= 4; // av-helg → undvik
+    else score += 1; // jobb-helg → ok
+  }
   
   // Undvik vissa dagar
   if (Array.isArray(prefs.avoidDays) && prefs.avoidDays.includes(dayIdx)) score -= 4;
@@ -14430,8 +14447,8 @@ function generateSchedulesForPeriod() {
           pool.sort((a,b) => {
             const gapA = a.contract - (weeklyHoursTracker[weekIdx][a.initials] || 0);
             const gapB = b.contract - (weeklyHoursTracker[weekIdx][b.initials] || 0);
-            const prefA = calcPreferenceScore(a, templateSlot, dayIdx, weekShifts);
-            const prefB = calcPreferenceScore(b, templateSlot, dayIdx, weekShifts);
+            const prefA = calcPreferenceScore(a, templateSlot, dayIdx, weekShifts, weekIdx);
+            const prefB = calcPreferenceScore(b, templateSlot, dayIdx, weekShifts, weekIdx);
             // Soft-points: pref-skillnad väger mer än timgap-skillnad
             // gap (timmar) brukar vara 5-40, prefScore brukar vara -8 till +5
             // Vi skalar upp pref-poäng × 2 så de är jämbördiga
@@ -14455,8 +14472,8 @@ function generateSchedulesForPeriod() {
             const halfB = b.contract * 0.5;
             const gapA = halfA - (weeklyHoursTracker[weekIdx][a.initials] || 0);
             const gapB = halfB - (weeklyHoursTracker[weekIdx][b.initials] || 0);
-            const prefA = calcPreferenceScore(a, templateSlot, dayIdx, weekShifts);
-            const prefB = calcPreferenceScore(b, templateSlot, dayIdx, weekShifts);
+            const prefA = calcPreferenceScore(a, templateSlot, dayIdx, weekShifts, weekIdx);
+            const prefB = calcPreferenceScore(b, templateSlot, dayIdx, weekShifts, weekIdx);
             return (gapB + prefB * 2) - (gapA + prefA * 2);
           });
           const picked = pool[0];
