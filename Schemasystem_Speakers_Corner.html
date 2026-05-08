@@ -10243,7 +10243,7 @@ function renderRotatedSchedule() {
   if (!head) return; // Steg 3-vyn inte rendrad än
   head.innerHTML = '<th class="day-col">Dag</th>';
   visibleEmps.forEach(emp => {
-    const deptColor = currentDept === 'all' ? `style="border-bottom:3px solid ${DEPT_INFO[emp.dept].color};"` : '';
+    const deptColor = currentDept === 'all' ? `style="border-bottom:3px solid ${(DEPT_INFO[emp.dept] || DEPT_INFO.serv).color};"` : '';
     head.innerHTML += `<th class="emp-head" ${deptColor}>
       <span class="emp-circle ${emp.initials}">${emp.initials}</span>
       <div class="emp-meta-head">${emp.type} · ${emp.contract||'flex'}${emp.contract?'h':''}</div>
@@ -10457,7 +10457,7 @@ function renderRotatedSchedule() {
   foot.innerHTML = hoursRow + costRow;
   
   // Update info — show department context
-  const deptLabel = currentDept === 'all' ? 'All personal' : DEPT_INFO[currentDept].label;
+  const deptLabel = currentDept === 'all' ? 'All personal' : ((DEPT_INFO[currentDept] || {}).label || currentDept || '—');
   
   // Använd riktigt veckonummer från periodWeeks
   let weekNumDisplay = currentWeek;
@@ -14679,11 +14679,13 @@ async function bbGenerateSchedule() {
     goStep(4);
   } catch (err) {
     console.error('FEL i goStep(4):', err);
+    // Plocka första rad ur stacktrace för bättre debug-info i toasten
+    const stackLine = err.stack ? (err.stack.split('\n').find(l => l.trim().startsWith('at')) || '').trim().slice(0, 90) : '';
     showToast({
       title: 'Schemat genererades men kunde inte visas',
-      detail: err.message || String(err),
+      detail: (err.message || String(err)) + (stackLine ? ' · ' + stackLine : ''),
       type: 'error',
-      duration: 8000,
+      duration: 10000,
     });
     return;
   }
