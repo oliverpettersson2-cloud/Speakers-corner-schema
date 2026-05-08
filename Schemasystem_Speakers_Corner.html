@@ -6,8 +6,8 @@
 <title>Schemasystem — Speakers Corner · Servis</title>
 <link rel="preconnect" href="https://fonts.googleapis.com/">
 <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="">
-<link href="file:///C:/Users/olive/Downloads/Schemasystem%20%E2%80%94%20Speakers%20Corner_files/css2" rel="stylesheet">
-<script src="file:///C:/Users/olive/Downloads/Schemasystem%20%E2%80%94%20Speakers%20Corner_files/xlsx.full.min.js.ladda%20ned"></script>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600;700&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root {
     --bg: #f4f1ea;
@@ -3776,64 +3776,6 @@
     border-top: 1px solid var(--line-soft);
   }
 
-  .preview-table {
-    background: #1a1815;
-    color: #e8e2d4;
-    padding: 0;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    overflow-x: auto;
-    border-radius: 2px;
-    box-shadow: var(--shadow);
-  }
-  .preview-table table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-  .preview-table thead th {
-    background: #2a2824;
-    color: #b8410e;
-    padding: 10px 12px;
-    text-align: left;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-size: 10px;
-    border-right: 1px solid #3a3834;
-    position: sticky;
-    top: 0;
-  }
-  .preview-table tbody td {
-    padding: 6px 12px;
-    border-bottom: 1px solid #2a2824;
-    border-right: 1px solid #2a2824;
-    white-space: nowrap;
-  }
-  .preview-table tbody tr:hover { background: #2a2824; }
-  .preview-section {
-    background: var(--bg-paper);
-    border: 1px solid var(--line);
-    padding: 18px;
-    margin-bottom: 20px;
-  }
-  .preview-section h3 {
-    font-family: 'Fraunces', serif;
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 10px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .preview-section h3 .meta {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: var(--ink-faint);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-weight: 500;
-  }
-
   /* ============ DEPARTMENT TABS ============ */
   .dept-tabs {
     display: flex;
@@ -7216,11 +7158,6 @@
       <div class="desc">Snyggt veckoschema att skriva ut för anställda. Öppnar utskriftsdialog.</div>
       <div class="stats">A4 · en sida per vecka</div>
     </div>
-  </div>
-
-  <div class="preview-section">
-    <h3>Förhandsvisning <span class="meta" id="previewMeta">— första 20 raderna</span></h3>
-    <div class="preview-table" id="csvPreviewTable"></div>
   </div>
 
   <div class="action-bar">
@@ -11252,39 +11189,14 @@ function renderExportPreview() {
   const totalCost = rows.reduce((s,r) => s + r['Total kostnad (kr)'], 0);
   const openCount = rows.filter(r => r['Anställd'] === '⚠ ÖPPET').length;
   const weekCount = (periodWeeks || []).length;
-  
+
   const openText = openCount > 0 ? ` · ⚠ ${openCount} öppna pass` : '';
-  document.getElementById('exportSub').textContent = 
+  document.getElementById('exportSub').textContent =
     `${weekCount} veckor · ${rows.length} pass${openText} · ${formatKr(totalCost)} total kostnad`;
-  document.getElementById('exportStat1').textContent = 
+  document.getElementById('exportStat1').textContent =
     `${rows.length} rader · ${formatKr(totalCost)} total`;
-  document.getElementById('exportStat2').textContent = 
+  document.getElementById('exportStat2').textContent =
     `${rows.length} rader · UTF-8`;
-  
-  // Build preview table (first 20 rows)
-  const previewRows = rows.slice(0, 20);
-  if (previewRows.length === 0) {
-    document.getElementById('csvPreviewTable').innerHTML = 
-      '<div style="padding:30px; text-align:center; color:var(--ink-faint); font-style:italic;">Inga pass att förhandsvisa. Generera ett schema först (steg 3).</div>';
-    document.getElementById('previewMeta').textContent = '— inga pass';
-    return;
-  }
-  const headers = Object.keys(previewRows[0]);
-  
-  let html = '<table><thead><tr>';
-  headers.forEach(h => html += `<th>${h}</th>`);
-  html += '</tr></thead><tbody>';
-  previewRows.forEach(r => {
-    const isOpen = r['Anställd'] === '⚠ ÖPPET';
-    html += `<tr${isOpen ? ' style="background:rgba(184,65,14,0.08); color:var(--accent); font-weight:600;"' : ''}>`;
-    headers.forEach(h => html += `<td>${r[h]}</td>`);
-    html += '</tr>';
-  });
-  html += '</tbody></table>';
-  
-  document.getElementById('csvPreviewTable').innerHTML = html;
-  document.getElementById('previewMeta').textContent = 
-    `— första ${Math.min(20, rows.length)} av ${rows.length} rader`;
 }
 
 // Re-bind step click handlers — använd window.goStep så onclick alltid använder senaste version
