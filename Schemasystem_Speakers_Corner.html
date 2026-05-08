@@ -132,6 +132,15 @@
     color: var(--ink-faint);
   }
   .step.active .step-title { color: var(--accent); }
+  .step.is-locked {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .step.is-locked .step-title::after {
+    content: ' 🔒';
+    font-size: 10px;
+    margin-left: 4px;
+  }
   .step-arrow { color: var(--line); margin: 0 2px; }
 
   main { padding: 20px 24px; }
@@ -8833,13 +8842,42 @@ function formatHours(hours) {
 // =========== NAVIGATION MELLAN STEGEN ===========
 // 1=Personal · 2=Mall · 3=Bemanningsbehov · 4=Schema · 5=Exportera
 // All step-relaterad render samlas här (istället för flera goStep-wraps)
+// Uppdatera lås-tillståndet på steg 4 och 5 utifrån om periodWeeks finns
+function refreshStepLocks() {
+  const hasSchedule = Array.isArray(periodWeeks) && periodWeeks.length > 0;
+  document.querySelectorAll('.step').forEach(s => {
+    const num = parseInt(s.dataset.step);
+    if (num === 4 || num === 5) {
+      s.classList.toggle('is-locked', !hasSchedule);
+    }
+  });
+}
+
 function goStep(n) {
+  // Blockera nav till steg som kräver ett genererat schema
+  const hasSchedule = Array.isArray(periodWeeks) && periodWeeks.length > 0;
+  if ((n === 4 || n === 5) && !hasSchedule) {
+    if (typeof showToast === 'function') {
+      showToast({
+        title: n === 4 ? 'Inget schema att visa' : 'Inget schema att exportera',
+        detail: 'Generera först via "Generera schema med AI" i steg 3 (Veckomall).',
+        type: 'warn',
+        duration: 5500,
+      });
+    }
+    // Skicka användaren till steg 3 (Veckomall) där genererings-knappen finns
+    if (n !== 3) return goStep(3);
+    return;
+  }
+
   // 1. Uppdatera stepper (header)
   document.querySelectorAll('.step').forEach((s) => {
     const num = parseInt(s.dataset.step);
-    s.classList.remove('active', 'done');
+    s.classList.remove('active', 'done', 'is-locked');
     if (num < n) s.classList.add('done');
     if (num === n) s.classList.add('active');
+    // Visa lås-stil på steg 4 och 5 om inget schema finns
+    if ((num === 4 || num === 5) && !hasSchedule) s.classList.add('is-locked');
   });
   
   // 2. Visa rätt step-content
@@ -8885,6 +8923,12 @@ function goStep(n) {
 }
 // Säkerställ global åtkomst
 window.goStep = goStep;
+window.refreshStepLocks = refreshStepLocks;
+
+// Initial låsstatus när sidan laddats (steg 4/5 låsta tills schema finns)
+document.addEventListener('DOMContentLoaded', refreshStepLocks);
+// Kör även direkt om DOM redan klar
+if (document.readyState !== 'loading') setTimeout(refreshStepLocks, 0);
 
 // Bind klickhandlers på stepper-stegen
 document.querySelectorAll('.step').forEach(s => {
@@ -14241,6 +14285,7 @@ async function bbGenerateSchedule() {
     }
 
     periodWeeks = newPeriodWeeks;
+    if (typeof refreshStepLocks === 'function') refreshStepLocks();
     activeWeekIdx = 0;
     if (typeof currentWeek !== 'undefined') currentWeek = 0;
 
@@ -14813,6 +14858,7 @@ function loadSavedSchedule(snapshotId) {
   // Re-render
   if (typeof renderRotatedSchedule === 'function') renderRotatedSchedule();
   if (typeof renderWeekTabs === 'function') renderWeekTabs();
+  if (typeof refreshStepLocks === 'function') refreshStepLocks();
   return true;
 }
 
