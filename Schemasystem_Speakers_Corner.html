@@ -14667,7 +14667,48 @@ function generateSchedulesForPeriod() {
           return;
         }
 
-        // === Strategi 4: ÖPPET PASS ===
+        // === Strategi 4: DEL mellan 50% och 100% — fyll upp till kontraktet innan öppet pass ===
+        candidates = employees.filter(e => e.type === 'DEL' && e.contract > 0);
+        candidates = candidates.filter(e => (weeklyHoursTracker[weekIdx][e.initials] || 0) < e.contract);
+        pool = candidates.filter(isAvailable);
+        if (pool.length > 0) {
+          pool.sort((a,b) => {
+            const gapA = a.contract - (weeklyHoursTracker[weekIdx][a.initials] || 0);
+            const gapB = b.contract - (weeklyHoursTracker[weekIdx][b.initials] || 0);
+            const prefA = calcPreferenceScore(a, templateSlot, dayIdx, weekShifts, weekIdx, weeklyShifts);
+            const prefB = calcPreferenceScore(b, templateSlot, dayIdx, weekShifts, weekIdx, weeklyShifts);
+            return (gapB + prefB * 2) - (gapA + prefA * 2);
+          });
+          const picked = pool[0];
+          const newShift = { i: picked.initials, s: templateSlot.s, e: templateSlot.e };
+          if (templateSlot.tag) newShift.tag = templateSlot.tag;
+          weekShifts[dayIdx].push(newShift);
+          weeklyHoursTracker[weekIdx][picked.initials] = (weeklyHoursTracker[weekIdx][picked.initials] || 0) + passHours;
+          return;
+        }
+
+        // === Strategi 5: TIM/EXT (timanställda + extra/vikarie) ===
+        candidates = employees.filter(e => e.type === 'TIM' || e.type === 'EXT');
+        pool = candidates.filter(isAvailable);
+        if (pool.length > 0) {
+          pool.sort((a,b) => {
+            // Prioritera lägst nuvarande timmar denna vecka (rättvisare fördelning)
+            const hoursA = weeklyHoursTracker[weekIdx][a.initials] || 0;
+            const hoursB = weeklyHoursTracker[weekIdx][b.initials] || 0;
+            const prefA = calcPreferenceScore(a, templateSlot, dayIdx, weekShifts, weekIdx, weeklyShifts);
+            const prefB = calcPreferenceScore(b, templateSlot, dayIdx, weekShifts, weekIdx, weeklyShifts);
+            // Mindre timmar + bättre pref = bättre kandidat
+            return (-hoursB + prefB * 2) - (-hoursA + prefA * 2);
+          });
+          const picked = pool[0];
+          const newShift = { i: picked.initials, s: templateSlot.s, e: templateSlot.e };
+          if (templateSlot.tag) newShift.tag = templateSlot.tag;
+          weekShifts[dayIdx].push(newShift);
+          weeklyHoursTracker[weekIdx][picked.initials] = (weeklyHoursTracker[weekIdx][picked.initials] || 0) + passHours;
+          return;
+        }
+
+        // === Strategi 6: ÖPPET PASS ===
         const openShift = {
           i: OPEN_SHIFT_MARKER,
           s: templateSlot.s,
