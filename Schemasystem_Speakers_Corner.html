@@ -7155,7 +7155,7 @@
     <div class="export-card" onclick="downloadHTML()">
       <span class="icon">⎙</span>
       <div class="title">PDF / Utskrift</div>
-      <div class="desc">Snyggt veckoschema att skriva ut för anställda. Öppnar utskriftsdialog.</div>
+      <div class="desc">Snyggt veckoschema att skriva ut för anställda. Öppnar förhandsvisning med <em>Skriv ut</em>-knapp.</div>
       <div class="stats">A4 · en sida per vecka</div>
     </div>
   </div>
@@ -11062,10 +11062,34 @@ function downloadExcel() {
   summary.push([]);
   summary.push(['Inkluderar arbetsgivaravgift 31,42%, semesterersättning 12% och OB-tillägg (27,59 kr/h, +24,31 kr/h natt 01–06)']);
   
+  // Kolumnbredder för skift-fliken (matchar buildExportRows)
+  const shiftCols = [
+    { wch: 4 },  // v.
+    { wch: 12 }, // Datum
+    { wch: 9 },  // Dag
+    { wch: 10 }, // Anställd
+    { wch: 5 },  // Typ
+    { wch: 8 },  // Avd
+    { wch: 6 },  // Start
+    { wch: 6 },  // Slut
+    { wch: 10 }, // Bruttotim
+    { wch: 10 }, // Rast (min)
+    { wch: 12 }, // Betalda tim
+    { wch: 14 }, // OB-tim totalt
+    { wch: 12 }, // OB natt-tim
+    { wch: 16 }, // OB-tillägg (kr)
+    { wch: 11 }, // Lönetyp
+    { wch: 14 }, // Grundlön (kr)
+    { wch: 14 }, // Bruttolön (kr)
+    { wch: 18 }, // Total kostnad (kr)
+    { wch: 22 }, // Notering
+  ];
+
   // Create workbook — "Alla pass" först så användaren landar på tider direkt
   const wb = XLSX.utils.book_new();
 
   const wsShifts = XLSX.utils.json_to_sheet(rows);
+  wsShifts['!cols'] = shiftCols;
   XLSX.utils.book_append_sheet(wb, wsShifts, 'Alla pass');
 
   // En flik per vecka för manuell granskning / utskrift
@@ -11073,11 +11097,20 @@ function downloadExcel() {
     const wkRows = rows.filter(r => r['v.'] === wk.weekNum);
     if (wkRows.length === 0) return;
     const ws = XLSX.utils.json_to_sheet(wkRows);
+    ws['!cols'] = shiftCols;
     XLSX.utils.book_append_sheet(wb, ws, 'v.' + wk.weekNum);
   });
 
   // Översikt sist — sammanfattning för referens
   const wsSummary = XLSX.utils.aoa_to_sheet(summary);
+  wsSummary['!cols'] = [
+    { wch: 22 }, // Vecka / Schemasystem-titel
+    { wch: 18 }, // Datum
+    { wch: 10 }, // Mall
+    { wch: 8 },  // Tim/v
+    { wch: 17 }, // Lönekostnad (kr)
+    { wch: 16 }, // Avvikelse
+  ];
   XLSX.utils.book_append_sheet(wb, wsSummary, 'Översikt');
   
   const filename = `schema_${restSlug}_${periodLabel.replace(/[^\w-]/g,'')}_${yearLabel}.xlsx`;
@@ -11132,7 +11165,8 @@ function downloadHTML() {
   // Build a printable HTML for all weeks
   let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Schema ${restName}</title>
   <style>
-    body { font-family: -apple-system, sans-serif; padding: 20px; color: #2b2a26; }
+    body { font-family: -apple-system, sans-serif; margin: 0; color: #2b2a26; }
+    .content { padding: 20px; }
     h1 { font-size: 22px; margin-bottom: 4px; }
     .sub { color: #888; font-size: 13px; margin-bottom: 20px; }
     h2 { font-size: 16px; margin-top: 30px; page-break-before: always; }
@@ -11143,7 +11177,30 @@ function downloadHTML() {
     .total { background: #eee; font-weight: bold; }
     .open { background: #ffeee6; color: #b8410e; font-weight: bold; }
     .tag { background: #f0e8d8; padding: 1px 5px; font-size: 10px; border-radius: 2px; }
-  </style></head><body>`;
+    .toolbar {
+      position: sticky; top: 0; z-index: 1000;
+      background: #faf7f0; border-bottom: 1px solid #d4cdb8;
+      padding: 10px 20px;
+      display: flex; justify-content: space-between; align-items: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .toolbar .info { color: #666; font-size: 12px; }
+    .toolbar button {
+      padding: 8px 16px; background: #b8410e; color: white;
+      border: none; cursor: pointer; font-size: 13px; font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .toolbar button:hover { background: #9c360a; }
+    @media print {
+      .toolbar { display: none; }
+      .content { padding: 0; }
+    }
+  </style></head><body>
+  <div class="toolbar">
+    <span class="info">Schema — ${restName} · ${periodLabel} ${yearLabel} · ${periodWeeks.length} veckor</span>
+    <button onclick="window.print()">⎙ Skriv ut</button>
+  </div>
+  <div class="content">`;
   html += `<h1>Schema — ${restName}</h1>
   <div class="sub">${periodLabel} ${yearLabel} · ${periodWeeks.length} veckor · genererad ${new Date().toLocaleDateString('sv-SE')}</div>`;
   
@@ -11169,15 +11226,13 @@ function downloadHTML() {
     }
     html += '</table>';
   });
-  html += '</body></html>';
-  
+  html += '</div></body></html>';
+
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const w = window.open(url);
-  if (w) {
-    w.addEventListener('load', () => { setTimeout(() => w.print(), 500); });
-  } else {
-    // Fallback: download
+  if (!w) {
+    // Popup blockerad → ladda ner som fallback
     const a = document.createElement('a');
     a.href = url;
     a.download = `schema_${restSlug}_${periodLabel.replace(/[^\w-]/g,'')}_${yearLabel}.html`;
