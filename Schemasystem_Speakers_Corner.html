@@ -7168,6 +7168,36 @@
 
 </main>
 
+<!-- ============ STARTDATUM-MODAL (visas vid byte till steg 2) ============ -->
+<div class="gen-modal-overlay" id="startDateModalOverlay">
+  <div class="gen-modal" style="width: 460px;">
+    <div class="gen-modal-head">
+      <div class="gen-modal-icon">📅</div>
+      <div>
+        <div class="gen-modal-title">Välj startdatum</div>
+        <div class="gen-modal-sub">När börjar perioden?</div>
+      </div>
+    </div>
+    <div class="gen-modal-body">
+      <div style="margin-bottom: 14px;">
+        <label class="bb-period-label">Startdatum</label>
+        <input type="date" class="bb-period-input" id="startDateModalInput" style="width: 100%;">
+        <div class="bb-period-hint" id="startDateModalHint" style="margin-top: 6px;">Schemat startar alltid på en måndag</div>
+      </div>
+      <div style="display: flex; gap: 8px; margin-bottom: 6px;">
+        <button type="button" class="btn" id="startDateModalNextMonday" style="flex: 1;">Nästa måndag</button>
+      </div>
+      <div class="gen-modal-question" id="startDateModalPreview" style="margin-top: 14px; font-size: 12px;">
+        Period: <strong id="startDateModalPeriodText">—</strong>
+      </div>
+    </div>
+    <div class="gen-modal-foot">
+      <button class="btn" onclick="startDateModalCancel()">Avbryt</button>
+      <button class="btn btn-primary" onclick="startDateModalConfirm()">Spara &amp; fortsätt ›</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ GENERERA-BEKRÄFTELSE MODAL ============ -->
 <div class="gen-modal-overlay" id="genModalOverlay">
   <div class="gen-modal">
@@ -8229,6 +8259,10 @@ function goStep(n) {
     case 2: // Bemanningsbehov
       if (typeof bbRenderAll === 'function') {
         setTimeout(bbRenderAll, 10);
+      }
+      // Tvinga deliberate val av startdatum varje gång man byter till steg 2
+      if (typeof showStartDateModal === 'function') {
+        setTimeout(showStartDateModal, 50);
       }
       break;
     case 3: // Veckomall
@@ -11204,14 +11238,21 @@ function downloadHTML() {
   html += `<h1>Schema — ${restName}</h1>
   <div class="sub">${periodLabel} ${yearLabel} · ${periodWeeks.length} veckor · genererad ${new Date().toLocaleDateString('sv-SE')}</div>`;
   
+  // Visa Notering-kolumnen bara om något pass har en tag (öppna pass syns redan via .open-row + ÖPPET-label)
+  const hasTags = periodWeeks.some(wk =>
+    (wk.shifts || []).some(daysShifts => (daysShifts || []).some(s => s.tag))
+  );
+  const colCount = hasTags ? 5 : 4;
+  const noteHeader = hasTags ? '<th>Notering</th>' : '';
+
   periodWeeks.forEach(wk => {
     html += `<h2>Vecka ${wk.weekNum} — ${formatDateRange(wk.startDate)} (Mall ${wk.pattern})${wk.note ? ' · '+wk.note : ''}</h2>`;
-    html += '<table><tr><th>Dag</th><th>Anställd</th><th>Tid</th><th>Tim</th><th>Notering</th></tr>';
+    html += `<table><tr><th>Dag</th><th>Anställd</th><th>Tid</th><th>Tim</th>${noteHeader}</tr>`;
     const dates = getWeekDates(wk.startDate);
     for (let d = 0; d < 7; d++) {
       const shifts = wk.shifts[d] || [];
       if (shifts.length === 0) {
-        html += `<tr><td>${dayNames[d]} ${dates[d].getDate()}/${dates[d].getMonth()+1}</td><td colspan="4">—</td></tr>`;
+        html += `<tr><td>${dayNames[d]} ${dates[d].getDate()}/${dates[d].getMonth()+1}</td><td colspan="${colCount - 1}">—</td></tr>`;
       } else {
         shifts.forEach((s, idx) => {
           const dur = shiftDuration(s);
@@ -11219,8 +11260,8 @@ function downloadHTML() {
           html += `<tr${isOpen ? ' class="open"' : ''}>`;
           if (idx === 0) html += `<td rowspan="${shifts.length}">${dayNames[d]} ${dates[d].getDate()}/${dates[d].getMonth()+1}</td>`;
           const empLabel = isOpen ? `⚠ ÖPPET (${s.dept === 'kok' ? 'kök' : 'servis'})` : s.i;
-          const tagHtml = s.tag ? `<span class="tag">${s.tag}</span>` : (isOpen ? 'BEHÖVER FYLLAS' : '');
-          html += `<td>${empLabel}</td><td>${s.s}–${s.e}</td><td>${dur.toFixed(1)}h</td><td>${tagHtml}</td></tr>`;
+          const noteCell = hasTags ? `<td>${s.tag ? `<span class="tag">${s.tag}</span>` : ''}</td>` : '';
+          html += `<td>${empLabel}</td><td>${s.s}–${s.e}</td><td>${dur.toFixed(1)}h</td>${noteCell}</tr>`;
         });
       }
     }
@@ -12718,6 +12759,76 @@ function bbGetISOWeekNumber(date) {
 }
 
 let _bbPeriodInitialized = false;
+
+// ===== STARTDATUM-MODAL =====
+function showStartDateModal() {
+  const overlay = document.getElementById('startDateModalOverlay');
+  const input = document.getElementById('startDateModalInput');
+  if (!overlay || !input) return;
+
+  // Förfyll med befintligt datum eller nästa måndag
+  let current = (typeof wizStartDate !== 'undefined' && wizStartDate instanceof Date)
+    ? wizStartDate
+    : bbNextMonday();
+  input.value = bbToISO(current);
+  startDateModalUpdatePreview();
+  overlay.classList.add('open');
+
+  // Bind events (idempotent)
+  input.oninput = startDateModalUpdatePreview;
+  const nextMondayBtn = document.getElementById('startDateModalNextMonday');
+  if (nextMondayBtn) {
+    nextMondayBtn.onclick = () => {
+      input.value = bbToISO(bbNextMonday());
+      startDateModalUpdatePreview();
+    };
+  }
+}
+
+function startDateModalUpdatePreview() {
+  const input = document.getElementById('startDateModalInput');
+  const hint = document.getElementById('startDateModalHint');
+  const preview = document.getElementById('startDateModalPeriodText');
+  if (!input || !preview) return;
+
+  const val = input.value;
+  if (!val) { preview.textContent = '—'; return; }
+
+  const start = new Date(val + 'T00:00:00');
+  if (hint) {
+    if (start.getDay() !== 1) {
+      hint.style.color = 'var(--accent)';
+      hint.textContent = '⚠ Bör vara en måndag — systemet justerar vid generering';
+    } else {
+      hint.style.color = '';
+      hint.textContent = 'Schemat startar alltid på en måndag';
+    }
+  }
+  const weeks = (typeof wizPeriodWeeks !== 'undefined' && wizPeriodWeeks) ? wizPeriodWeeks : 8;
+  const end = bbAddDays(start, weeks * 7 - 1);
+  const startWk = bbGetISOWeekNumber(start);
+  const endWk = bbGetISOWeekNumber(end);
+  preview.innerHTML = `<strong>${weeks} v.</strong> · v.${startWk}–v.${endWk} · ${bbFormatSwedishShort(start)} – ${bbFormatSwedishShort(end)} ${end.getFullYear()}`;
+}
+
+function startDateModalConfirm() {
+  const input = document.getElementById('startDateModalInput');
+  if (!input || !input.value) return;
+
+  const start = new Date(input.value + 'T00:00:00');
+  if (typeof wizStartDate !== 'undefined') wizStartDate = start;
+
+  // Synka inline-fältet i steg 2
+  const inlineInput = document.getElementById('bbStartDate');
+  if (inlineInput) inlineInput.value = input.value;
+  if (typeof bbUpdatePeriodMeta === 'function') bbUpdatePeriodMeta();
+
+  document.getElementById('startDateModalOverlay').classList.remove('open');
+}
+
+function startDateModalCancel() {
+  document.getElementById('startDateModalOverlay').classList.remove('open');
+}
 
 function bbInitPeriodIfNeeded() {
   if (_bbPeriodInitialized) return;
