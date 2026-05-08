@@ -6601,15 +6601,18 @@
   <div class="page-head">
     <div>
       <h1 class="page-title">Veckomall <span class="accent">— A/B-rotation</span></h1>
-      <div class="page-sub">Mallen för hur veckorna roterar · klicka pass för att redigera · "+ pass" för att lägga till</div>
+      <div class="page-sub">Auto-byggd från bemanningsbehovet · klicka pass för att redigera · "+ pass" för att lägga till</div>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-primary" onclick="autoFillMallFromBB()" title="Bygg om mallen från steg 2:s bemanningsbehov + öppettider">🔄 Auto-fyll från steg 2</button>
     </div>
   </div>
 
   <div class="alert info" style="margin-bottom:18px;">
     <span class="icon">◐</span>
     <div>
-      <strong>Detta är grunden för schema-genereringen</strong>
-      Algoritmen försöker tilldela personerna i mallen först. Om någon är frånvarande eller har slutat, hittar AI:n en ersättare automatiskt enligt reglerna (vila, dept, solo). Vecka A används vecka 0,2,4,6 och B används vecka 1,3,5,7.
+      <strong>Mallen byggs automatiskt från bemanningsbehovet</strong>
+      Pass-tider härleds från öppettider + heldag/dag/kväll-fördelningen i steg 2. Algoritmen i steg 4 tilldelar sedan rätt personer baserat på kontrakt och önskemål. Du kan tweaka enstaka pass här om du vill ha specialfall (t.ex. leveranspass på onsdag).
     </div>
   </div>
 
@@ -14451,10 +14454,11 @@ function generateSchedulesForPeriod() {
       templateSlots.forEach(templateSlot => {
         const passHours = shiftDurationHours(templateSlot.s, templateSlot.e);
         const suggestedInitials = templateSlot.i;
-        const suggestedEmp = employees.find(e => e.initials === suggestedInitials);
+        const suggestedEmp = suggestedInitials ? employees.find(e => e.initials === suggestedInitials) : null;
 
-        // Bestäm dept för slotten
-        const slotDept = suggestedEmp ? suggestedEmp.dept : 'serv';
+        // Bestäm dept för slotten — föredra explicit dept-fält (auto-genererad mall),
+        // annars suggested employee, annars default servis
+        const slotDept = templateSlot.dept || (suggestedEmp ? suggestedEmp.dept : 'serv');
 
         // Hjälpare: kolla om en kandidat passar för slotten
         const isAvailable = (emp) => {
@@ -15461,8 +15465,18 @@ function mallShiftHours(s, e) {
 }
 
 // Hämta dept-färg för en initialer baserat på personalens dept
-function mallShiftColor(initials) {
-  const emp = employees.find(e => e.initials === initials);
+function mallShiftColor(initialsOrShift) {
+  // Hanterar både legacy (sträng = initialer) och nytt (objekt med .dept fallback)
+  if (initialsOrShift && typeof initialsOrShift === 'object') {
+    if (initialsOrShift.i) {
+      const emp = employees.find(e => e.initials === initialsOrShift.i);
+      if (emp) return emp.dept === 'serv' ? 'var(--ok)' : 'var(--accent)';
+    }
+    if (initialsOrShift.dept === 'serv') return 'var(--ok)';
+    if (initialsOrShift.dept === 'kok') return 'var(--accent)';
+    return 'var(--ink-faint)';
+  }
+  const emp = employees.find(e => e.initials === initialsOrShift);
   if (!emp) return 'var(--ink-faint)';
   return emp.dept === 'serv' ? 'var(--ok)' : 'var(--accent)';
 }
@@ -15781,8 +15795,15 @@ function mallSetDept(dept) {
 }
 
 // Hämta dept för en initialer (för filtrering)
-function mallGetDept(initials) {
-  const emp = employees.find(e => e.initials === initials);
+function mallGetDept(initialsOrShift) {
+  if (initialsOrShift && typeof initialsOrShift === 'object') {
+    if (initialsOrShift.i) {
+      const emp = employees.find(e => e.initials === initialsOrShift.i);
+      if (emp) return emp.dept;
+    }
+    return initialsOrShift.dept || null;
+  }
+  const emp = employees.find(e => e.initials === initialsOrShift);
   return emp ? emp.dept : null;
 }
 
@@ -15798,7 +15819,7 @@ function renderMallWeek(pattern) {
     // Filtrera på aktiv dept-vy
     const dayShifts = mallDept === 'all'
       ? allDayShifts
-      : allDayShifts.filter(s => mallGetDept(s.i) === mallDept);
+      : allDayShifts.filter(s => mallGetDept(s) === mallDept);
     
     // För korrekt index-mapping, behåll original-index så mallEditShift fortfarande pekar rätt
     const dayShiftsWithIdx = dayShifts.map(sh => ({
@@ -15825,11 +15846,15 @@ function renderMallWeek(pattern) {
       html += `<div class="mall-day-empty">${emptyMsg}</div>`;
     } else {
       dayShiftsWithIdx.forEach(({ sh, origIdx }) => {
-        const color = mallShiftColor(sh.i);
+        const color = mallShiftColor(sh);
         const dur = mallShiftHours(sh.s, sh.e);
         const tagHtml = sh.tag ? `<span class="mall-shift-tag">${escapeHTML(sh.tag)}</span>` : '<span></span>';
+        // Visa "öppet" + dept-prefix för slots utan tilldelad person (auto-genererad mall)
+        const initLabel = sh.i
+          ? escapeHTML(sh.i)
+          : `<span style="opacity:0.6; font-style:italic;">öppet ${sh.dept === 'kok' ? '(K)' : sh.dept === 'serv' ? '(S)' : ''}</span>`;
         html += `<div class="mall-shift" style="--shift-color:${color};" onclick="mallEditShift('${pattern}', ${dayIdx}, ${origIdx})">
-          <div class="mall-shift-init">${escapeHTML(sh.i)}</div>
+          <div class="mall-shift-init">${initLabel}</div>
           <div class="mall-shift-time">${sh.s} – ${sh.e}</div>
           ${tagHtml}
           <div class="mall-shift-dur">${dur.toFixed(1)}h</div>
@@ -15850,6 +15875,85 @@ function renderMallWeek(pattern) {
   }
 }
 
+// Bygg en mall-struktur (en vecka) från bemanningsbehov + öppettider
+// Heuristik: heldag = full öppettid, dag = öppning→16:00, kvall = 16:00→stängning
+function buildMallFromBB() {
+  const dayKeys = ['mon','tue','wed','thu','fri','sat','sun'];
+  const splitTime = '16:00'; // dag/kvall-pivot
+  const result = {};
+
+  for (let d = 0; d < 7; d++) {
+    const dayKey = dayKeys[d];
+    const opening = (typeof bbOpenings !== 'undefined' && bbOpenings[dayKey]) || {};
+    const shifts = [];
+
+    ['serv', 'kok'].forEach(dept => {
+      const need = (bbNeed && bbNeed[dept] && bbNeed[dept][dayKey]) || { heldag:0, dag:0, kvall:0 };
+      const startKey = dept === 'serv' ? 'servStart' : 'kokStart';
+      const endKey = dept === 'serv' ? 'servEnd' : 'kokEnd';
+      const start = opening[startKey] || (dept === 'serv' ? '10:00' : '08:00');
+      const end = opening[endKey] || (dept === 'serv' ? '21:15' : '21:45');
+
+      // Heldag: hela öppettiden
+      for (let i = 0; i < (need.heldag || 0); i++) {
+        shifts.push({ i: '', s: start, e: end, dept });
+      }
+      // Dag: start → splitTime
+      for (let i = 0; i < (need.dag || 0); i++) {
+        shifts.push({ i: '', s: start, e: splitTime, dept });
+      }
+      // Kväll: splitTime → end
+      for (let i = 0; i < (need.kvall || 0); i++) {
+        shifts.push({ i: '', s: splitTime, e: end, dept });
+      }
+    });
+
+    // Sortera: starttid stigande
+    shifts.sort((a,b) => a.s.localeCompare(b.s));
+    result[d] = shifts;
+  }
+
+  return result;
+}
+
+// Ersätt schedule.A och schedule.B med auto-byggd mall + persistera
+async function autoFillMallFromBB() {
+  // Varna om mallen redan har data så vi inte raderar manuella ändringar oavsiktligt
+  const hasData = ['A','B'].some(p => {
+    if (!schedule[p]) return false;
+    for (let d = 0; d < 7; d++) {
+      if ((schedule[p][d] || []).length > 0) return true;
+    }
+    return false;
+  });
+
+  if (hasData) {
+    const proceed = await showConfirm({
+      title: 'Bygg om mallen från steg 2?',
+      sub: '— eventuella manuella tweaks försvinner',
+      message: 'Detta ersätter både Vecka A och B med pass härledda från öppettider + heldag/dag/kvall i steg 2. Person-tilldelningar görs sedan av algoritmen i steg 4.',
+      confirmText: 'Ja, bygg om',
+      type: 'warn',
+    });
+    if (!proceed) return;
+  }
+
+  const fresh = buildMallFromBB();
+  schedule.A = JSON.parse(JSON.stringify(fresh));
+  schedule.B = JSON.parse(JSON.stringify(fresh));
+  if (typeof persistAll === 'function') persistAll();
+  if (typeof renderMall === 'function') renderMall();
+  if (typeof showToast === 'function') {
+    let total = 0;
+    for (let d = 0; d < 7; d++) total += (fresh[d] || []).length;
+    showToast({
+      title: 'Mall byggd från bemanningsbehov',
+      detail: `${total * 2} pass totalt (A+B) · alla öppna, AI fyller i steg 4`,
+      type: 'success',
+    });
+  }
+}
+
 // Rendera båda mall-veckor
 function renderMall() {
   if (!schedule || !schedule.A || !schedule.B) return;
@@ -15863,7 +15967,7 @@ function renderMall() {
       const ds = (schedule[p] && schedule[p][d]) || [];
       ds.forEach(s => {
         allCount++;
-        const dept = mallGetDept(s.i);
+        const dept = mallGetDept(s);
         if (dept === 'serv') servCount++;
         else if (dept === 'kok') kokCount++;
       });
