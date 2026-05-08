@@ -951,6 +951,83 @@
   }
 
   /* SUPER-TYDLIG ÖPPEN-PASS-BANNER — sticky, orange, kan ej missas */
+  /* ============ FILL-STATUS (steg 4) ============ */
+  .fill-status {
+    display: grid;
+    grid-template-columns: 44px 1fr 200px auto;
+    gap: 16px;
+    align-items: center;
+    background: var(--bg-paper);
+    border: 1px solid var(--line);
+    border-left: 6px solid var(--ok);
+    padding: 14px 18px;
+    margin-bottom: 12px;
+    border-radius: 2px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+  }
+  .fill-status.has-open { border-left-color: var(--warn); }
+  .fill-status.is-perfect { border-left-color: var(--ok); background: rgba(94,134,80,0.06); }
+  .fill-status-icon {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: var(--ok);
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .fill-status.has-open .fill-status-icon { background: var(--warn); }
+  .fill-status-text { min-width: 0; }
+  .fill-status-title {
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.2;
+  }
+  .fill-status-title #fillFilled,
+  .fill-status-title #fillTotal {
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .fill-status.is-perfect .fill-status-title #fillFilled,
+  .fill-status.is-perfect .fill-status-title #fillTotal {
+    color: var(--ok);
+  }
+  .fill-status-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 3px;
+  }
+  .fill-status-bar {
+    height: 8px;
+    background: var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .fill-status-bar-fill {
+    height: 100%;
+    background: var(--ok);
+    width: 0%;
+    transition: width 0.4s ease;
+    border-radius: 4px;
+  }
+  .fill-status.has-open .fill-status-bar-fill { background: var(--warn); }
+  .fill-status-pct {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--ok);
+    min-width: 56px;
+    text-align: right;
+  }
+  .fill-status.has-open .fill-status-pct { color: var(--warn); }
+
   /* ============ ÖPPNA PASS — TYDLIG VARNING (steg 4) ============ */
   .op-banner {
     background: linear-gradient(135deg, rgba(184,65,14,0.10), rgba(184,65,14,0.04));
@@ -7151,6 +7228,17 @@
     </div>
   </div>
 
+  <!-- ============ FILL-STATUS ============ -->
+  <div class="fill-status" id="fillStatusBox" style="display:none;">
+    <div class="fill-status-icon" id="fillStatusIcon">✓</div>
+    <div class="fill-status-text">
+      <div class="fill-status-title"><span id="fillFilled">0</span> av <span id="fillTotal">0</span> pass fyllda</div>
+      <div class="fill-status-sub" id="fillStatusSub">— inget genererat ännu</div>
+    </div>
+    <div class="fill-status-bar"><div class="fill-status-bar-fill" id="fillStatusBarFill"></div></div>
+    <div class="fill-status-pct" id="fillStatusPct">0%</div>
+  </div>
+
   <!-- ============ ÖPPNA PASS — TYDLIG VARNING ============ -->
   <div class="op-banner" id="openShiftsBanner" style="display:none;">
     <div class="op-banner-head">
@@ -11293,8 +11381,53 @@ function renderWeekTabs() {
     tabs.appendChild(tab);
   });
   
-  // Uppdatera även den stora bannern
+  // Uppdatera även den stora bannern + fill-status-rutan
   updateOpenShiftsBanner();
+  if (typeof updateFillStatus === 'function') updateFillStatus();
+}
+
+// Uppdaterar fyllnadsstatus-rutan ('X av Y pass fyllda' + progressbar)
+function updateFillStatus() {
+  const box = document.getElementById('fillStatusBox');
+  if (!box) return;
+
+  if (!periodWeeks || periodWeeks.length === 0) {
+    box.style.display = 'none';
+    return;
+  }
+
+  let total = 0, openCount = 0;
+  periodWeeks.forEach(wk => {
+    if (!wk.shifts) return;
+    for (let d = 0; d < 7; d++) {
+      (wk.shifts[d] || []).forEach(s => {
+        total++;
+        if (s.i === OPEN_SHIFT_MARKER) openCount++;
+      });
+    }
+  });
+
+  if (total === 0) {
+    box.style.display = 'none';
+    return;
+  }
+
+  const filled = total - openCount;
+  const pct = Math.round((filled / total) * 100);
+  const isPerfect = openCount === 0;
+
+  box.style.display = '';
+  box.classList.toggle('has-open', !isPerfect);
+  box.classList.toggle('is-perfect', isPerfect);
+
+  document.getElementById('fillFilled').textContent = filled;
+  document.getElementById('fillTotal').textContent = total;
+  document.getElementById('fillStatusPct').textContent = pct + '%';
+  document.getElementById('fillStatusBarFill').style.width = pct + '%';
+  document.getElementById('fillStatusIcon').textContent = isPerfect ? '✓' : '⚠';
+  document.getElementById('fillStatusSub').textContent = isPerfect
+    ? '✓ Alla pass tilldelade — schemat är komplett'
+    : `${openCount} öppna pass kvar att tilldela`;
 }
 
 // Uppdaterar den stora varnings-bannern högst upp i Schema-vyn
