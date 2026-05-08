@@ -1561,6 +1561,75 @@
   .mall-shift-modal-overlay.open { display: flex; }
 
   /* ============ GENERERA-BEKRÄFTELSE MODAL ============ */
+  /* AI-loader (visas under schemagenerering, högre z-index än alla modaler) */
+  .ai-loader-overlay {
+    position: fixed; inset: 0;
+    background: rgba(43,42,38,0.78);
+    backdrop-filter: blur(2px);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 2000;
+    padding: 20px;
+  }
+  .ai-loader-overlay.open { display: flex; }
+  .ai-loader-card {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    width: 360px;
+    max-width: 100%;
+    padding: 32px 28px;
+    text-align: center;
+    box-shadow: 0 16px 48px rgba(43,42,38,0.45);
+    border-radius: 2px;
+  }
+  .ai-loader-icon {
+    font-size: 56px;
+    line-height: 1;
+    margin-bottom: 16px;
+    display: inline-block;
+    animation: ai-loader-flip 1.4s ease-in-out infinite;
+    transform-origin: center;
+  }
+  @keyframes ai-loader-flip {
+    0%   { transform: rotate(0deg); }
+    50%  { transform: rotate(180deg); }
+    100% { transform: rotate(360deg); }
+  }
+  .ai-loader-title {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 6px;
+    letter-spacing: 0.01em;
+  }
+  .ai-loader-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 22px;
+  }
+  .ai-loader-bar {
+    height: 3px;
+    background: var(--line);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+  .ai-loader-bar-fill {
+    position: absolute;
+    inset: 0;
+    background: var(--accent);
+    transform-origin: left center;
+    animation: ai-loader-progress 3s linear forwards;
+  }
+  @keyframes ai-loader-progress {
+    0%   { transform: scaleX(0); }
+    100% { transform: scaleX(1); }
+  }
+
   .gen-modal-overlay {
     position: fixed; inset: 0;
     background: rgba(43,42,38,0.65);
@@ -7201,6 +7270,16 @@
 </div>
 
 </main>
+
+<!-- ============ AI-GENERERAR LOADER ============ -->
+<div class="ai-loader-overlay" id="aiLoaderOverlay">
+  <div class="ai-loader-card">
+    <div class="ai-loader-icon">⏳</div>
+    <div class="ai-loader-title">AI-genererar schema</div>
+    <div class="ai-loader-sub" id="aiLoaderSub">Tilldelar pass enligt mall &amp; bemanningsbehov…</div>
+    <div class="ai-loader-bar"><div class="ai-loader-bar-fill"></div></div>
+  </div>
+</div>
 
 <!-- ============ SPARA-VERSION-MODAL (steg 5) ============ -->
 <div class="gen-modal-overlay" id="saveScheduleModalOverlay">
@@ -13424,15 +13503,27 @@ async function bbGenerateSchedule() {
   
   if (!userConfirmed) return;
 
+  // Visa AI-loader (minst 3s synlig så det syns tydligt att något händer)
+  showAILoader();
+  const _aiLoaderStart = Date.now();
+  // Yield till renderaren så overlay hinner ritas innan algoritmen blockerar tråden
+  await new Promise(r => setTimeout(r, 50));
+
   // KÖR ALGORITMEN — wrappa i try/catch så vi ser tydliga felmeddelanden
   let result;
   try {
     result = generateSchedulesForPeriod();
   } catch (err) {
+    hideAILoader();
     console.error('FEL i generateSchedulesForPeriod:', err);
     alert('Kunde inte generera schema:\n\n' + (err.message || err) + '\n\nÖppna utvecklarverktyg (F12) för full stack trace.');
     return;
   }
+
+  // Vänta in resterande tid till totalt 3 sekunder
+  const _elapsed = Date.now() - _aiLoaderStart;
+  if (_elapsed < 3000) await new Promise(r => setTimeout(r, 3000 - _elapsed));
+  hideAILoader();
   
   if (!result || !result.weeklyShifts) {
     alert('Algoritmen returnerade inget resultat. Kontrollera att veckomallen har pass.');
@@ -14116,6 +14207,28 @@ let mallDept = 'all'; // 'all' | 'serv' | 'kok'
 
 // =========== KOSTNAD-BANNER (kollapsbar) ===========
 let _costBannerOpen = false;
+
+// =========== AI-LOADER ===========
+function showAILoader(subText) {
+  const overlay = document.getElementById('aiLoaderOverlay');
+  if (!overlay) return;
+  if (subText) {
+    const sub = document.getElementById('aiLoaderSub');
+    if (sub) sub.textContent = subText;
+  }
+  // Restart progress-bar-animationen genom att ta bort + lägga tillbaka klassen
+  const fill = overlay.querySelector('.ai-loader-bar-fill');
+  if (fill) {
+    fill.style.animation = 'none';
+    void fill.offsetWidth; // reflow så animation kan startas om
+    fill.style.animation = '';
+  }
+  overlay.classList.add('open');
+}
+function hideAILoader() {
+  const overlay = document.getElementById('aiLoaderOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
 
 // =========== GENERERA-BEKRÄFTELSE MODAL ===========
 let _genModalResolver = null;
