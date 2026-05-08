@@ -12477,14 +12477,41 @@ function confirmPicker() {
     let conflictCount = 0;
     let didReplaceCurrent = false;
 
+    // Hjälp-räknare för minuter (för fuzzy time-match när tider varierar lite)
+    const toMin = t => {
+      const [h,m] = (t||'').split(':').map(Number);
+      return (h||0)*60 + (m||0);
+    };
+    const refStartMin = toMin(ref.start);
+    const refEndMin = toMin(ref.end);
+
     targetWeeks.forEach(wkIdx => {
       const wkShifts = periodWeeks[wkIdx]?.shifts;
       if (!wkShifts || !wkShifts[ref.dayIdx]) { noMatchCount++; return; }
 
-      // Hitta matchande öppet pass i denna vecka (samma dag/tid/avd)
-      const idx = wkShifts[ref.dayIdx].findIndex(s =>
+      const dayShifts = wkShifts[ref.dayIdx];
+
+      // Tier 1: exakt match (samma dag, tid, avdelning)
+      let idx = dayShifts.findIndex(s =>
         s.i === OPEN_SHIFT_MARKER && s.s === ref.start && s.e === ref.end && s.dept === ref.dept
       );
+
+      // Tier 2: samma dag + avdelning, närmaste starttid (fuzzy match — hanterar veckor
+      // där tider justerats lite, t.ex. helgdag)
+      if (idx < 0) {
+        const candidates = dayShifts
+          .map((s, i) => ({ s, i }))
+          .filter(x => x.s.i === OPEN_SHIFT_MARKER && x.s.dept === ref.dept);
+        if (candidates.length > 0) {
+          // Välj den med minsta diff i start+slut
+          candidates.sort((a, b) => {
+            const dA = Math.abs(toMin(a.s.s) - refStartMin) + Math.abs(toMin(a.s.e) - refEndMin);
+            const dB = Math.abs(toMin(b.s.s) - refStartMin) + Math.abs(toMin(b.s.e) - refEndMin);
+            return dA - dB;
+          });
+          idx = candidates[0].i;
+        }
+      }
 
       if (idx < 0) {
         noMatchCount++;
@@ -12492,7 +12519,7 @@ function confirmPicker() {
       }
 
       // Kontrollera dubbelbokning — fråga bara på aktuella veckan, hoppa över tyst på övriga
-      const existingForPerson = wkShifts[ref.dayIdx].find((s, i) =>
+      const existingForPerson = dayShifts.find((s, i) =>
         i !== idx && s.i === pickerState.selectedInitials
       );
       if (existingForPerson) {
@@ -12506,23 +12533,29 @@ function confirmPicker() {
         }
       }
 
-      // Ersätt öppet pass med tilldelad person
+      // Ersätt öppet pass med tilldelad person — använd tiderna från det öppna passet
+      // (annars skulle vi skriva över olika tider med picker-input som bara matchade ref-veckan)
+      const targetShift = dayShifts[idx];
       wkShifts[ref.dayIdx][idx] = {
         i: pickerState.selectedInitials,
-        s: start,
-        e: end
+        s: targetShift.s,
+        e: targetShift.e
       };
       filledCount++;
       if (wkIdx === currentWeek) didReplaceCurrent = true;
       if (wkIdx !== currentWeek) periodWeeks[wkIdx].modified = true;
     });
 
-    // Om aktuella veckan hade matchande öppet pass eller vi fyllde minst en vecka, klart
+    // Persistera + alltid rendera om så badges/UI uppdateras
+    if (typeof persistAll === 'function') persistAll();
+    if (typeof renderWeekTabs === 'function') renderWeekTabs();
+    if (typeof renderRotatedSchedule === 'function') renderRotatedSchedule();
+
     if (filledCount > 0) {
-      if (applyTo !== 'this' && filledCount > 1) {
+      if (applyTo !== 'this') {
         const detailParts = [];
-        if (noMatchCount > 0) detailParts.push(`${noMatchCount} veckor saknade motsvarande öppet pass`);
-        if (conflictCount > 0) detailParts.push(`${conflictCount} veckor hade redan annan person`);
+        if (noMatchCount > 0) detailParts.push(`${noMatchCount} veckor saknade öppet pass`);
+        if (conflictCount > 0) detailParts.push(`${conflictCount} veckor hade krock`);
         showToast({
           title: `${filledCount} öppna pass fyllda med ${pickerState.selectedInitials}`,
           detail: detailParts.join(' · ') || null,
@@ -12530,11 +12563,17 @@ function confirmPicker() {
         });
       }
       closePicker();
-      renderWeekTabs();
-      renderRotatedSchedule();
       return;
     }
-    // Om inget öppet pass hittades alls, fortsätt som vanligt (skapa nytt)
+
+    // Inget öppet pass hittades alls — varna istället för att skapa nya pass
+    showToast({
+      title: 'Inget öppet pass att fylla',
+      detail: `Hittade ingen matchning för ${ref.start}–${ref.end} (${ref.dept}) i ${targetWeeks.length} veckor`,
+      type: 'warn',
+    });
+    closePicker();
+    return;
   }
 
   // Kolla i nuvarande vecka om personen redan har pass den dagen
