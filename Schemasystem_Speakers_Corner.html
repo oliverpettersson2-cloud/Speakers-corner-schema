@@ -463,8 +463,28 @@
     transition: all .15s;
   }
   .btn:hover { border-color: var(--ink); }
-  .btn-primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-  .btn-primary:hover { background: var(--accent); border-color: var(--accent); }
+
+  /* Primära CTA-knappar — alltid orange, större och mer prominenta */
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+    padding: 11px 22px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    box-shadow: 0 2px 8px rgba(184,65,14,0.22);
+  }
+  .btn-primary:hover {
+    background: #9c360a;
+    border-color: #9c360a;
+    box-shadow: 0 4px 14px rgba(184,65,14,0.35);
+    transform: translateY(-1px);
+  }
+  .btn-primary:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(184,65,14,0.22);
+  }
   .btn-accent { background: var(--accent); color: white; border-color: var(--accent); }
 
   /* Stor pulserande CTA — drar blicken till "Nästa"-knappen */
