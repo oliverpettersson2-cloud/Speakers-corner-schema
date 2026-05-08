@@ -11119,18 +11119,83 @@ function downloadExcel() {
     { wch: 22 }, // Notering
   ];
 
+  // Hjälpare: vilka kolumner är numeriska och ska summeras
+  const numericCols = [
+    'Bruttotim', 'Rast (min)', 'Betalda tim',
+    'OB-tim totalt', 'OB natt-tim', 'OB-tillägg (kr)',
+    'Grundlön (kr)', 'Bruttolön (kr)', 'Total kostnad (kr)'
+  ];
+  const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+
+  // Hjälpare: bygg total-rad med label i 'Anställd'-kolumnen och summor i numeriska kolumner
+  function buildTotalRow(label, rowSubset) {
+    const sums = {};
+    numericCols.forEach(c => sums[c] = 0);
+    rowSubset.forEach(r => {
+      numericCols.forEach(c => {
+        const v = parseFloat(r[c]);
+        if (!isNaN(v)) sums[c] += v;
+      });
+    });
+    return headers.map(h => {
+      if (h === 'Anställd') return label;
+      if (numericCols.includes(h)) {
+        // Tim-kolumner med 2 decimaler, kr-kolumner som heltal
+        if (h.includes('tim') && !h.includes('kr')) return Number(sums[h].toFixed(2));
+        return Math.round(sums[h]);
+      }
+      return '';
+    });
+  }
+
+  // Sortering: Datum, sedan Start
+  const sortByDateStart = (a, b) => {
+    if (a['Datum'] !== b['Datum']) return a['Datum'].localeCompare(b['Datum']);
+    return (a['Start'] || '').localeCompare(b['Start'] || '');
+  };
+
   // Create workbook — "Alla pass" först så användaren landar på tider direkt
   const wb = XLSX.utils.book_new();
 
-  const wsShifts = XLSX.utils.json_to_sheet(rows);
+  // "Alla pass" — sorterad efter Avd → Datum → Start för bättre läsbarhet
+  const allRowsSorted = rows.slice().sort((a, b) => {
+    if (a['Avd'] !== b['Avd']) return a['Avd'].localeCompare(b['Avd']);
+    return sortByDateStart(a, b);
+  });
+  const wsShifts = XLSX.utils.json_to_sheet(allRowsSorted);
   wsShifts['!cols'] = shiftCols;
   XLSX.utils.book_append_sheet(wb, wsShifts, 'Alla pass');
 
-  // En flik per vecka för manuell granskning / utskrift
+  // Per-vecka-flik: sektioner per avdelning + totaler
   periodWeeks.forEach(wk => {
     const wkRows = rows.filter(r => r['v.'] === wk.weekNum);
     if (wkRows.length === 0) return;
-    const ws = XLSX.utils.json_to_sheet(wkRows);
+
+    const kokRows = wkRows.filter(r => r['Avd'] === 'Kök').sort(sortByDateStart);
+    const servRows = wkRows.filter(r => r['Avd'] === 'Servis').sort(sortByDateStart);
+    const otherRows = wkRows.filter(r => r['Avd'] !== 'Kök' && r['Avd'] !== 'Servis').sort(sortByDateStart);
+
+    const aoa = [headers]; // Kolumnrubriker högst upp
+
+    function pushSection(label, secRows) {
+      if (secRows.length === 0) return;
+      aoa.push([]); // tom rad som visuell separator
+      const labelRow = headers.map(() => '');
+      labelRow[0] = '═══ ' + label + ' ═══';
+      aoa.push(labelRow);
+      secRows.forEach(r => aoa.push(headers.map(h => r[h])));
+      aoa.push(buildTotalRow('▶ TOTAL ' + label, secRows));
+    }
+
+    pushSection('KÖK', kokRows);
+    pushSection('SERVIS', servRows);
+    if (otherRows.length > 0) pushSection('ÖVRIGT', otherRows);
+
+    // Veckans grand total
+    aoa.push([]);
+    aoa.push(buildTotalRow('▶▶ VECKANS TOTAL', wkRows));
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols'] = shiftCols;
     XLSX.utils.book_append_sheet(wb, ws, 'v.' + wk.weekNum);
   });
