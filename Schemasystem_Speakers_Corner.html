@@ -4687,6 +4687,27 @@
     margin-bottom: -1px;
   }
   .cand-top-banner .star { font-size: 12px; margin-right: 6px; }
+  .cand-warn-banner {
+    background: linear-gradient(90deg, var(--err), #a82828);
+    color: white;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 700;
+    padding: 6px 14px;
+    text-align: center;
+    border-radius: 1px 1px 0 0;
+    margin-bottom: -1px;
+  }
+  .cand-warn-banner .warn-icon { font-size: 12px; margin-right: 6px; }
+  .candidate-row.is-already-working {
+    background: rgba(139,26,26,0.08);
+    opacity: 0.85;
+  }
+  .candidate-row.is-already-working .cand-circle {
+    opacity: 0.65;
+  }
   
   .cand-circle {
     width: 36px; height: 36px;
@@ -10467,8 +10488,9 @@ function openModal(day, initials, shiftIdx) {
   document.getElementById('modalEnd').value = shift.e;
   document.getElementById('modalNote').value = shift.tag || '';
   document.getElementById('modalDelete').style.display = 'inline-block';
+  refreshApplyToDropdowns(); // Bygg vecko-options från faktiska periodWeeks
   document.getElementById('modalApplyTo').value = 'this';
-  
+
   updateModalStats();
   document.getElementById('modalOverlay').classList.add('open');
 }
@@ -10533,10 +10555,44 @@ function updateModalStats() {
 // Helper: vilka vecko-index ska påverkas baserat på apply-to-val
 function getTargetWeekIdxs(applyTo) {
   if (applyTo === 'this') return [currentWeek];
-  if (applyTo === 'all') return [0, 1, 2, 3, 4, 5, 6, 7];
-  if (applyTo === 'A') return [0, 2, 4, 6]; // udda index = A enligt periodWeeks
-  if (applyTo === 'B') return [1, 3, 5, 7];
+  const total = (periodWeeks && periodWeeks.length) || 0;
+  const all = Array.from({ length: total }, (_, i) => i);
+  if (applyTo === 'all') return all;
+  if (applyTo === 'A') return all.filter(i => i % 2 === 0); // udda index = A enligt periodWeeks
+  if (applyTo === 'B') return all.filter(i => i % 2 === 1);
   return [currentWeek];
+}
+
+// Bygg HTML för "Tillämpa på"-dropdownen baserat på faktiska periodWeeks
+function buildApplyToOptionsHTML() {
+  if (!periodWeeks || periodWeeks.length === 0) {
+    return `<option value="this">Endast denna vecka</option>`;
+  }
+  const total = periodWeeks.length;
+  const aWeeks = [], bWeeks = [];
+  periodWeeks.forEach((wk, idx) => {
+    (idx % 2 === 0 ? aWeeks : bWeeks).push('v.' + wk.weekNum);
+  });
+  const firstWk = periodWeeks[0].weekNum;
+  const lastWk = periodWeeks[total - 1].weekNum;
+  return `
+    <option value="this">Endast denna vecka</option>
+    <option value="A">Alla A-veckor (${aWeeks.join(', ')})</option>
+    <option value="B">Alla B-veckor (${bWeeks.join(', ')})</option>
+    <option value="all">Alla ${total} veckor (v.${firstWk}–v.${lastWk})</option>
+  `;
+}
+
+// Uppdatera båda apply-to-dropdownsen — bevarar valt värde
+function refreshApplyToDropdowns() {
+  const html = buildApplyToOptionsHTML();
+  ['modalApplyTo', 'pickerApplyTo'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const prev = el.value;
+    el.innerHTML = html;
+    if (prev) el.value = prev;
+  });
 }
 
 function saveShift() {
@@ -12194,6 +12250,7 @@ function openPicker(day, preselectedInitials, opts) {
   renderCandidates();
   renderAlreadyWorking();
   updatePickerSummary();
+  refreshApplyToDropdowns(); // Bygg vecko-options från faktiska periodWeeks
   document.getElementById('pickerSaveBtn').disabled = !pickerState.selectedInitials;
   document.getElementById('pickerApplyTo').value = 'this'; // Reset to default
   document.getElementById('pickerOverlay').classList.add('open');
@@ -12356,23 +12413,27 @@ function renderCandidates() {
   
   candidates = candidates.map(emp => {
     let weekHoursSoFar = 0;
+    let existingShiftToday = null; // Pass denna person redan har idag (om något)
     for (let d = 0; d < 7; d++) {
       const dayShifts = currentWeekShifts()[d] || [];
       dayShifts.forEach(s => {
-        if (s.i === emp.initials) weekHoursSoFar += shiftPaidHours(s);
+        if (s.i === emp.initials) {
+          weekHoursSoFar += shiftPaidHours(s);
+          if (d === pickerState.day) existingShiftToday = s;
+        }
       });
     }
-    
+
     const totalAfter = weekHoursSoFar + newPaidHours;
     const cost = shiftTotalCost(fakeShift, pickerState.day, emp);
     const ob = shiftOBHours(fakeShift, pickerState.day);
     const rate = getEmpHourlyRate(emp);
     const obAmount = ob.obRegular * OB_REGULAR + ob.obNight * OB_NIGHT_EXTRA;
-    
+
     // Status-bestämning
     let statusKey = 'ok';
     let sortPriority = 50;
-    
+
     if (emp.contract > 0) {
       if (totalAfter > emp.contract * 1.10) {
         statusKey = emp.exception ? 'exception' : 'over';
@@ -12382,13 +12443,12 @@ function renderCandidates() {
         sortPriority = 70;
       } else if (totalAfter >= emp.contract * 0.85) {
         statusKey = 'best';
-        sortPriority = 10;  // Bästa kandidaten
+        sortPriority = 10;
       } else {
         statusKey = 'ok';
         sortPriority = 20;
       }
     } else {
-      // Tim/extra utan kontrakt — alltid 'ok' utom om de redan jobbat mycket
       if (totalAfter > 40) {
         statusKey = 'warn';
         sortPriority = 60;
@@ -12397,7 +12457,10 @@ function renderCandidates() {
         sortPriority = 25;
       }
     }
-    
+
+    // Jobbar redan idag — pusha till botten oavsett kontrakt-status
+    if (existingShiftToday) sortPriority = 95;
+
     return {
       ...emp,
       weekHoursSoFar,
@@ -12408,6 +12471,7 @@ function renderCandidates() {
       obTotal: ob.obRegular,
       statusKey,
       sortPriority,
+      existingShiftToday,
     };
   });
   
@@ -12422,9 +12486,17 @@ function renderCandidates() {
     const dept = DEPT_INFO[c.dept] || DEPT_INFO.serv;
     const deptLabel = dept.label;
 
+    // Jobbar redan idag — overrid all annan status med tydlig varning
+    const isAlreadyWorking = !!c.existingShiftToday;
+
     // Status text & icon
     let statusIcon = '✓', statusText = 'OK';
-    if (c.statusKey === 'best') { statusIcon = '✓'; statusText = 'Bästa val'; }
+    let displayStatusKey = c.statusKey;
+    if (isAlreadyWorking) {
+      statusIcon = '⚠';
+      statusText = `Pass ${c.existingShiftToday.s}–${c.existingShiftToday.e}`;
+      displayStatusKey = 'over'; // röd-färgad status
+    } else if (c.statusKey === 'best') { statusIcon = '✓'; statusText = 'Bästa val'; }
     else if (c.statusKey === 'ok') { statusIcon = '○'; statusText = 'Ledig'; }
     else if (c.statusKey === 'warn') { statusIcon = '◐'; statusText = 'Närmar sig taket'; }
     else if (c.statusKey === 'over') { statusIcon = '⚠'; statusText = 'Över kontraktstak'; }
@@ -12435,14 +12507,16 @@ function renderCandidates() {
     const barWidth = Math.min(100, (c.totalAfter / barMax) * 100);
     const markerPos = c.contract > 0 ? (c.contract / barMax) * 100 : -1;
 
-    // Markera första kandidaten som verkligen är "best" (inom kontraktstak ≥85%) som BÄSTA MATCH
-    const isTopMatch = !topMatchMarked && c.statusKey === 'best';
+    // Bara icke-konflikt-kandidater kan vara TOP MATCH
+    const isTopMatch = !isAlreadyWorking && !topMatchMarked && c.statusKey === 'best';
     if (isTopMatch) topMatchMarked = true;
 
-    const cls = `candidate-row status-${c.statusKey}${isSelected ? ' selected' : ''}${isTopMatch ? ' is-top-match' : ''}`;
+    const cls = `candidate-row status-${displayStatusKey}${isSelected ? ' selected' : ''}${isTopMatch ? ' is-top-match' : ''}${isAlreadyWorking ? ' is-already-working' : ''}`;
     const topBanner = isTopMatch
       ? `<div class="cand-top-banner"><span class="star">★</span>Bästa match för detta passet</div>`
-      : '';
+      : (isAlreadyWorking
+        ? `<div class="cand-warn-banner"><span class="warn-icon">⚠</span>Jobbar redan denna dag — ${c.existingShiftToday.s}–${c.existingShiftToday.e}</div>`
+        : '');
     
     // Wage display
     let wageStr;
