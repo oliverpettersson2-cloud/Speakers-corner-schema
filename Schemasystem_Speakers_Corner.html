@@ -7747,18 +7747,6 @@
         </div><!-- ep-empperiod-body slut -->
       </div>
 
-      <!-- ============ FRÅNVAROPERIODER ============ -->
-      <div class="ep-absences-section" id="epAbsencesSection">
-        <div class="ep-absences-head" onclick="document.getElementById(&#39;epAbsencesSection&#39;).classList.toggle(&#39;is-expanded&#39;)">
-          <span class="ep-absences-title">Frånvaroperioder <span class="accent">— semester, sjuk, etc.</span></span>
-          <span class="ep-absences-meta" id="epAbsencesCount">— inga registrerade</span>
-        </div>
-        <div class="ep-absences-body">
-          <div class="ep-absences-list" id="epAbsencesList"><!-- renderas av JS --></div>
-          <button type="button" class="ep-absences-add" onclick="epAddAbsence()">+ Lägg till frånvaroperiod</button>
-        </div>
-      </div>
-
       <div class="modal-stat" style="margin-top:14px;">
         <div class="modal-stat-row">
           <span>Total kostnad inkl. avgifter</span>
@@ -8745,7 +8733,7 @@ function editPerson(initials) {
   if (typeof epLoadPreferences === 'function') epLoadPreferences(emp);
   
   // Stäng alla expanderbara sektioner som default — Nina öppnar dem själv vid behov
-  ['epPrefsSection', 'epEmpperiodSection', 'epAbsencesSection'].forEach(id => {
+  ['epPrefsSection', 'epEmpperiodSection'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.remove('is-expanded');
   });
