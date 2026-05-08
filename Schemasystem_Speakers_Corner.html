@@ -7008,14 +7008,6 @@
       <h1 class="page-title">Schema <span class="accent" id="step2ViewLabel">— vecka A</span></h1>
       <div class="page-sub" id="weekTitle">v.18 · 27 apr – 3 maj · Servis · 109h · 32&nbsp;217 kr</div>
     </div>
-    <div style="display:flex; gap:6px; align-items:center;">
-      <!-- VIEW TOGGLE -->
-      <div class="view-toggle">
-        <button class="view-btn active" data-view="week" onclick="setStep2View(&#39;week&#39;)">📅 Vecka</button>
-        <button class="view-btn" data-view="month" onclick="setStep2View(&#39;month&#39;)">🗓️ Månad</button>
-      </div>
-      <button class="btn">Spara</button>
-    </div>
   </div>
 
   <!-- ============ ÖPPNA PASS — TYDLIG VARNING ============ -->
@@ -7030,7 +7022,7 @@
     </div>
     <div class="op-banner-body" id="osbBody" style="display:none;">
       <div class="op-banner-help">
-        Klicka <strong>Fyll alla X veckor</strong> bredvid en slot-typ för att tilldela samma person till det öppna passet i alla veckor som har samma slot.
+        Klicka <strong>Tilldela</strong> bredvid en slot-typ för att fylla samma person på det öppna passet i alla veckor som har samma slot.
       </div>
       <div class="op-banner-list" id="osbList"><!-- renderas av JS --></div>
     </div>
@@ -11177,7 +11169,7 @@ function updateOpenShiftsBanner() {
       <div class="op-slot-count">${weekCount} öppna</div>
       <button type="button" class="op-slot-fill-btn"
         onclick="bulkFillOpenSlot(${firstWkIdx}, ${slot.dayIdx}, '${slot.start}', '${slot.end}', '${slot.dept}')">
-        Fyll alla ${weekCount} ${weekCount === 1 ? 'vecka' : 'veckor'}
+        Tilldela
       </button>
     </div>`;
   }).join('');
