@@ -10,7 +10,11 @@ Schemaläggningssystem för svenska restauranger byggt enligt Visita / Gröna Ri
 
 ## Hur du kör den
 
-Öppna `Schemasystem_Speakers_Corner.html` i en webbläsare (Chrome/Edge/Firefox). Det är allt — appen kör helt klient-side. Data sparas i webbläsarens `localStorage` under nyckeln `schemasystem_v1`.
+**Live (GitHub Pages):** https://oliverpettersson2-cloud.github.io/Speakers-corner-schema/
+
+**Lokalt:** Öppna `Schemasystem_Speakers_Corner.html` i en webbläsare (Chrome/Edge/Firefox). Det är allt — appen kör helt klient-side. Data sparas i webbläsarens `localStorage` under nyckeln `schemasystem_v1`.
+
+> ⚠️ Eftersom datan ligger i `localStorage` har varje URL/domän sin egen separata data — den lokala filen och Pages-versionen delar inte personal/scheman.
 
 ## Flödet
 
@@ -45,7 +49,8 @@ Prototyp under utveckling. Mål: gå från manuella scheman till AI-stött syste
 
 ## Roadmap (utkast)
 
-- [ ] Versionshantering via Git/GitHub
+- [x] Versionshantering via Git/GitHub
+- [x] Hosting via GitHub Pages
 - [ ] Polish + buggfixar i nuvarande prototyp
 - [ ] Riktig SMHI-väderintegration (idag demo-data)
 - [ ] Peak-prioritering i AI-algoritmen
