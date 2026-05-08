@@ -893,6 +893,154 @@
   }
 
   /* SUPER-TYDLIG ÖPPEN-PASS-BANNER — sticky, orange, kan ej missas */
+  /* ============ ÖPPNA PASS — TYDLIG VARNING (steg 4) ============ */
+  .op-banner {
+    background: linear-gradient(135deg, rgba(184,65,14,0.10), rgba(184,65,14,0.04));
+    border: 1px solid var(--accent);
+    border-left: 6px solid var(--accent);
+    margin-bottom: 18px;
+    box-shadow: 0 2px 14px rgba(184,65,14,0.12);
+    border-radius: 2px;
+  }
+  .op-banner-head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+  }
+  .op-banner-icon {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .op-banner-titles { flex: 1; min-width: 0; }
+  .op-banner-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.2;
+  }
+  .op-banner-title #osbCount {
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 22px;
+    margin-right: 4px;
+  }
+  .op-banner-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 3px;
+  }
+  .op-banner-toggle {
+    background: var(--accent);
+    color: white;
+    border: 1px solid var(--accent);
+    padding: 10px 18px;
+    font-family: 'Fraunces', serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 1px;
+    box-shadow: 0 2px 6px rgba(184,65,14,0.25);
+    transition: background 0.15s ease;
+    flex-shrink: 0;
+  }
+  .op-banner-toggle:hover {
+    background: #9c360a;
+  }
+  .op-banner-body {
+    border-top: 1px solid rgba(184,65,14,0.25);
+    padding: 14px 20px 18px;
+    background: var(--bg-paper);
+  }
+  .op-banner-help {
+    font-family: 'Fraunces', serif;
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin-bottom: 12px;
+    line-height: 1.5;
+  }
+  .op-banner-help strong { color: var(--ink); }
+  .op-banner-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .op-slot-row {
+    display: grid;
+    grid-template-columns: 32px 1fr auto auto;
+    gap: 12px;
+    align-items: center;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--accent);
+    padding: 10px 14px;
+    border-radius: 1px;
+  }
+  .op-slot-row.kok { border-left-color: var(--accent); }
+  .op-slot-row.serv { border-left-color: var(--ok); }
+  .op-slot-dept-pill {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    color: white;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .op-slot-row.kok .op-slot-dept-pill { background: var(--accent); }
+  .op-slot-row.serv .op-slot-dept-pill { background: var(--ok); }
+  .op-slot-info {
+    display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  }
+  .op-slot-title {
+    font-family: 'Fraunces', serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .op-slot-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .op-slot-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    background: rgba(184,65,14,0.08);
+    padding: 4px 10px;
+    border-radius: 1px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .op-slot-fill-btn {
+    background: var(--accent);
+    color: white;
+    border: 1px solid var(--accent);
+    padding: 8px 14px;
+    font-family: 'Fraunces', serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 1px;
+    white-space: nowrap;
+    transition: background 0.15s ease;
+  }
+  .op-slot-fill-btn:hover { background: #9c360a; }
+
   .open-shifts-banner {
     display: flex;
     align-items: center;
@@ -6870,6 +7018,24 @@
     </div>
   </div>
 
+  <!-- ============ ÖPPNA PASS — TYDLIG VARNING ============ -->
+  <div class="op-banner" id="openShiftsBanner" style="display:none;">
+    <div class="op-banner-head">
+      <div class="op-banner-icon">⚠</div>
+      <div class="op-banner-titles">
+        <div class="op-banner-title"><span id="osbCount">0</span> öppna pass behöver tilldelas</div>
+        <div class="op-banner-sub" id="osbSub">— fördelade på flera veckor</div>
+      </div>
+      <button type="button" class="op-banner-toggle" id="osbToggle" onclick="toggleOpenShiftsBanner()">Visa &amp; fyll lista ›</button>
+    </div>
+    <div class="op-banner-body" id="osbBody" style="display:none;">
+      <div class="op-banner-help">
+        Klicka <strong>Fyll alla X veckor</strong> bredvid en slot-typ för att tilldela samma person till det öppna passet i alla veckor som har samma slot.
+      </div>
+      <div class="op-banner-list" id="osbList"><!-- renderas av JS --></div>
+    </div>
+  </div>
+
   <!-- DEPARTMENT TABS (always visible) -->
   <div class="dept-tabs" id="deptTabs">
     <button class="dept-tab kok" data-dept="kok">
@@ -10944,18 +11110,20 @@ function renderWeekTabs() {
   updateOpenShiftsBanner();
 }
 
-// Uppdaterar den stora orangea bannern högst upp i Schema-vyn
+// Uppdaterar den stora varnings-bannern högst upp i Schema-vyn
 function updateOpenShiftsBanner() {
   const banner = document.getElementById('openShiftsBanner');
   const countEl = document.getElementById('osbCount');
   const subEl = document.getElementById('osbSub');
   if (!banner || !countEl) return;
-  
-  // Räkna öppna pass både i nuvarande vecka och totalt över perioden
+
+  // Gruppera öppna pass per slot-typ (dayIdx + dept + start + end)
+  const slotMap = new Map();
   let totalOpen = 0;
   let weeksWithOpen = 0;
+
   if (typeof periodWeeks !== 'undefined' && Array.isArray(periodWeeks)) {
-    periodWeeks.forEach(wk => {
+    periodWeeks.forEach((wk, wkIdx) => {
       let wkOpen = 0;
       if (wk.shifts) {
         for (let d = 0; d < 7; d++) {
@@ -10963,6 +11131,11 @@ function updateOpenShiftsBanner() {
             if (s.i === OPEN_SHIFT_MARKER) {
               totalOpen++;
               wkOpen++;
+              const key = `${d}|${s.dept}|${s.s}|${s.e}`;
+              if (!slotMap.has(key)) {
+                slotMap.set(key, { dayIdx: d, dept: s.dept, start: s.s, end: s.e, weeks: [] });
+              }
+              slotMap.get(key).weeks.push(wkIdx);
             }
           });
         }
@@ -10970,35 +11143,77 @@ function updateOpenShiftsBanner() {
       if (wkOpen > 0) weeksWithOpen++;
     });
   }
-  
+
   if (totalOpen === 0) {
     banner.style.display = 'none';
     return;
   }
-  
-  // Räkna också i nuvarande vecka för subtexten
-  let currentWeekOpen = 0;
-  const wkShifts = (typeof currentWeekShifts === 'function') ? currentWeekShifts() : null;
-  if (wkShifts) {
-    for (let d = 0; d < 7; d++) {
-      (wkShifts[d] || []).forEach(s => {
-        if (s.i === OPEN_SHIFT_MARKER) currentWeekOpen++;
-      });
-    }
-  }
-  
-  banner.style.display = 'flex';
+
+  banner.style.display = '';
   countEl.textContent = totalOpen;
-  
-  let sub;
-  if (weeksWithOpen === 1) {
-    sub = `i ${weeksWithOpen} vecka — klicka för lista`;
+  const totalWeeks = (periodWeeks || []).length;
+  subEl.textContent = `Fördelade på ${weeksWithOpen} av ${totalWeeks} veckor · ${slotMap.size} olika slot-typer`;
+
+  // Rendera listan inuti bannern
+  const list = document.getElementById('osbList');
+  if (!list) return;
+  const dayNamesShort = ['Måndag','Tisdag','Onsdag','Torsdag','Fredag','Lördag','Söndag'];
+  const slots = [...slotMap.values()].sort((a, b) => {
+    if (a.dayIdx !== b.dayIdx) return a.dayIdx - b.dayIdx;
+    return a.start.localeCompare(b.start);
+  });
+
+  list.innerHTML = slots.map(slot => {
+    const deptLabel = slot.dept === 'serv' ? 'Servis' : (slot.dept === 'kok' ? 'Kök' : '—');
+    const deptShort = slot.dept === 'serv' ? 'S' : (slot.dept === 'kok' ? 'K' : '·');
+    const weekCount = slot.weeks.length;
+    const firstWkIdx = slot.weeks[0];
+    return `<div class="op-slot-row ${slot.dept}">
+      <div class="op-slot-dept-pill">${deptShort}</div>
+      <div class="op-slot-info">
+        <div class="op-slot-title">${dayNamesShort[slot.dayIdx]} · ${slot.start}–${slot.end}</div>
+        <div class="op-slot-meta">${deptLabel} · finns i ${weekCount} ${weekCount === 1 ? 'vecka' : 'veckor'}</div>
+      </div>
+      <div class="op-slot-count">${weekCount} öppna</div>
+      <button type="button" class="op-slot-fill-btn"
+        onclick="bulkFillOpenSlot(${firstWkIdx}, ${slot.dayIdx}, '${slot.start}', '${slot.end}', '${slot.dept}')">
+        Fyll alla ${weekCount} ${weekCount === 1 ? 'vecka' : 'veckor'}
+      </button>
+    </div>`;
+  }).join('');
+}
+
+// Toggle expand/collapse av bannerns lista
+function toggleOpenShiftsBanner() {
+  const body = document.getElementById('osbBody');
+  const toggle = document.getElementById('osbToggle');
+  if (!body || !toggle) return;
+  const isOpen = body.style.display !== 'none';
+  if (isOpen) {
+    body.style.display = 'none';
+    toggle.textContent = 'Visa & fyll lista ›';
   } else {
-    sub = `fördelade på ${weeksWithOpen} veckor`;
-    if (currentWeekOpen > 0) sub += ` · ${currentWeekOpen} i denna vecka`;
-    sub += ` — klicka för lista`;
+    body.style.display = '';
+    toggle.textContent = '‹ Dölj lista';
   }
-  subEl.textContent = sub;
+}
+
+// Öppnar picker för en slot-typ med applyTo='all' förvalt
+function bulkFillOpenSlot(weekIdx, dayIdx, start, end, dept) {
+  if (typeof currentWeek !== 'undefined' && weekIdx !== currentWeek) {
+    currentWeek = weekIdx;
+    if (typeof renderWeekTabs === 'function') renderWeekTabs();
+    if (typeof renderRotatedSchedule === 'function') renderRotatedSchedule();
+  }
+  if (typeof openPicker === 'function') {
+    openPicker(dayIdx, null, {
+      presetStart: start,
+      presetEnd: end,
+      forceDept: dept,
+      openShiftRef: { weekIdx, dayIdx, start, end, dept },
+      applyTo: 'all',
+    });
+  }
 }
 
 // Scrolla ner till öppna-pass-listan
@@ -12252,7 +12467,8 @@ function openPicker(day, preselectedInitials, opts) {
   updatePickerSummary();
   refreshApplyToDropdowns(); // Bygg vecko-options från faktiska periodWeeks
   document.getElementById('pickerSaveBtn').disabled = !pickerState.selectedInitials;
-  document.getElementById('pickerApplyTo').value = 'this'; // Reset to default
+  // Förvalt apply-to-värde — 'this' default, men kan overrides via opts (t.ex. 'all' från bulk-fill-banner)
+  document.getElementById('pickerApplyTo').value = opts.applyTo || 'this';
   document.getElementById('pickerOverlay').classList.add('open');
 }
 
