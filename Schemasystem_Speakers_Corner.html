@@ -4579,6 +4579,28 @@
   .candidate-row.status-warn { border-left: 3px solid var(--warn); background: rgba(168,107,0,0.04); }
   .candidate-row.status-over { border-left: 3px solid var(--err); background: rgba(139,26,26,0.04); }
   .candidate-row.status-exception { border-left: 3px solid var(--accent); }
+  .candidate-row.is-top-match {
+    border-left-width: 6px;
+    background: rgba(94,134,80,0.07);
+    box-shadow: 0 2px 8px rgba(94,134,80,0.18);
+    border-top: 1px solid var(--ok);
+    border-right: 1px solid var(--ok);
+    border-bottom: 1px solid var(--ok);
+  }
+  .cand-top-banner {
+    background: linear-gradient(90deg, var(--ok), #6a8e58);
+    color: white;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-weight: 700;
+    padding: 6px 14px;
+    text-align: center;
+    border-radius: 1px 1px 0 0;
+    margin-bottom: -1px;
+  }
+  .cand-top-banner .star { font-size: 12px; margin-right: 6px; }
   
   .cand-circle {
     width: 36px; height: 36px;
@@ -4807,26 +4829,38 @@
     gap: 4px;
   }
   .paw-shift {
-    display: flex; align-items: center; gap: 6px;
-    padding: 4px 6px;
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px;
     background: white;
-    border-left: 2px solid var(--line);
+    border-left: 4px solid var(--line);
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
+    font-size: 12px;
+    border-radius: 1px;
   }
   .paw-shift.serv { border-left-color: var(--ok); }
   .paw-shift.kok { border-left-color: var(--accent); }
-  .paw-shift.open { border-left-color: var(--accent); border-left-style: dashed; opacity: 0.6; }
+  .paw-shift.open { border-left-color: var(--accent); border-left-style: dashed; opacity: 0.7; background: rgba(184,65,14,0.04); }
+  .paw-shift .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .paw-shift.serv .dot { background: var(--ok); }
+  .paw-shift.kok .dot { background: var(--accent); }
+  .paw-shift.open .dot { background: transparent; border: 1.5px dashed var(--accent); }
   .paw-shift .ini {
     font-family: 'Fraunces', serif;
     font-weight: 700;
-    font-size: 12px;
-    min-width: 24px;
+    font-size: 14px;
+    min-width: 28px;
+    color: var(--ink);
+    letter-spacing: 0.02em;
   }
   .paw-shift .time {
     color: var(--ink-soft);
+    font-weight: 600;
   }
   .paw-shift.open .ini { color: var(--accent); font-style: italic; }
+  .paw-shift.open .time { color: var(--accent); font-style: italic; }
   .paw-empty {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
@@ -12082,6 +12116,7 @@ function renderAlreadyWorking() {
   const buildShiftRow = (s) => {
     if (s.i === OPEN_SHIFT_MARKER) {
       return `<div class="paw-shift open ${s.dept}">
+        <span class="dot"></span>
         <span class="ini">öppet</span>
         <span class="time">${s.s}–${s.e}</span>
       </div>`;
@@ -12089,6 +12124,7 @@ function renderAlreadyWorking() {
     const emp = employees.find(e => e.initials === s.i);
     const dept = emp ? emp.dept : 'serv';
     return `<div class="paw-shift ${dept}">
+      <span class="dot"></span>
       <span class="ini">${s.i}</span>
       <span class="time">${s.s}–${s.e}</span>
     </div>`;
@@ -12243,11 +12279,12 @@ function renderCandidates() {
   
   // Render
   list.innerHTML = '';
+  let topMatchMarked = false;
   candidates.forEach(c => {
     const isSelected = c.initials === pickerState.selectedInitials;
     const dept = DEPT_INFO[c.dept] || DEPT_INFO.serv;
     const deptLabel = dept.label;
-    
+
     // Status text & icon
     let statusIcon = '✓', statusText = 'OK';
     if (c.statusKey === 'best') { statusIcon = '✓'; statusText = 'Bästa val'; }
@@ -12255,13 +12292,20 @@ function renderCandidates() {
     else if (c.statusKey === 'warn') { statusIcon = '◐'; statusText = 'Närmar sig taket'; }
     else if (c.statusKey === 'over') { statusIcon = '⚠'; statusText = 'Över kontraktstak'; }
     else if (c.statusKey === 'exception') { statusIcon = '◐'; statusText = 'Undantag'; }
-    
+
     // Belastningsstapel
     const barMax = 50;
     const barWidth = Math.min(100, (c.totalAfter / barMax) * 100);
     const markerPos = c.contract > 0 ? (c.contract / barMax) * 100 : -1;
-    
-    const cls = `candidate-row status-${c.statusKey}${isSelected ? ' selected' : ''}`;
+
+    // Markera första kandidaten som verkligen är "best" (inom kontraktstak ≥85%) som BÄSTA MATCH
+    const isTopMatch = !topMatchMarked && c.statusKey === 'best';
+    if (isTopMatch) topMatchMarked = true;
+
+    const cls = `candidate-row status-${c.statusKey}${isSelected ? ' selected' : ''}${isTopMatch ? ' is-top-match' : ''}`;
+    const topBanner = isTopMatch
+      ? `<div class="cand-top-banner"><span class="star">★</span>Bästa match för detta passet</div>`
+      : '';
     
     // Wage display
     let wageStr;
@@ -12271,7 +12315,7 @@ function renderCandidates() {
       wageStr = `${formatKr(c.wage)}/mån`;
     }
     
-    list.innerHTML += `<div class="${cls}" onclick="selectCandidate('${c.initials}')">
+    list.innerHTML += `${topBanner}<div class="${cls}" onclick="selectCandidate('${c.initials}')">
       <div class="cand-circle" style="background:${dept.color};">${c.initials}</div>
       <div class="cand-info">
         <div class="cand-name-row">
