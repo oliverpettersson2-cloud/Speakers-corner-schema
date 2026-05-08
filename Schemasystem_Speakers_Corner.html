@@ -12192,36 +12192,66 @@ function confirmPicker() {
   // ===== SPECIALFALL: ersätt öppet pass =====
   if (pickerState.openShiftRef) {
     const ref = pickerState.openShiftRef;
-    const wkShifts = periodWeeks[ref.weekIdx]?.shifts;
-    if (wkShifts && wkShifts[ref.dayIdx]) {
-      // Hitta öppet pass igen (kan ha flyttats om listan ändrats)
+    const targetWeeks = getTargetWeekIdxs(applyTo);
+    let filledCount = 0;
+    let noMatchCount = 0;
+    let conflictCount = 0;
+    let didReplaceCurrent = false;
+
+    targetWeeks.forEach(wkIdx => {
+      const wkShifts = periodWeeks[wkIdx]?.shifts;
+      if (!wkShifts || !wkShifts[ref.dayIdx]) { noMatchCount++; return; }
+
+      // Hitta matchande öppet pass i denna vecka (samma dag/tid/avd)
       const idx = wkShifts[ref.dayIdx].findIndex(s =>
         s.i === OPEN_SHIFT_MARKER && s.s === ref.start && s.e === ref.end && s.dept === ref.dept
       );
-      if (idx >= 0) {
-        // Kontrollera dubbelbokning
-        const existingForPerson = wkShifts[ref.dayIdx].find((s, i) =>
-          i !== idx && s.i === pickerState.selectedInitials
-        );
-        if (existingForPerson) {
+
+      if (idx < 0) {
+        noMatchCount++;
+        return;
+      }
+
+      // Kontrollera dubbelbokning — fråga bara på aktuella veckan, hoppa över tyst på övriga
+      const existingForPerson = wkShifts[ref.dayIdx].find((s, i) =>
+        i !== idx && s.i === pickerState.selectedInitials
+      );
+      if (existingForPerson) {
+        if (wkIdx === currentWeek) {
           if (!confirm(`${pickerState.selectedInitials} har redan ett pass denna dag (${existingForPerson.s}–${existingForPerson.e}). Tilldela ändå?`)) {
             return;
           }
+        } else {
+          conflictCount++;
+          return;
         }
-        // Ersätt
-        wkShifts[ref.dayIdx][idx] = {
-          i: pickerState.selectedInitials,
-          s: start,
-          e: end
-        };
-        if (ref.weekIdx !== currentWeek) periodWeeks[ref.weekIdx].modified = true;
-        closePicker();
-        renderWeekTabs();
-        renderRotatedSchedule();
-        return;
       }
+
+      // Ersätt öppet pass med tilldelad person
+      wkShifts[ref.dayIdx][idx] = {
+        i: pickerState.selectedInitials,
+        s: start,
+        e: end
+      };
+      filledCount++;
+      if (wkIdx === currentWeek) didReplaceCurrent = true;
+      if (wkIdx !== currentWeek) periodWeeks[wkIdx].modified = true;
+    });
+
+    // Om aktuella veckan hade matchande öppet pass eller vi fyllde minst en vecka, klart
+    if (filledCount > 0) {
+      if (applyTo !== 'this' && filledCount > 1) {
+        let msg = `${filledCount} öppna pass fyllda med ${pickerState.selectedInitials}.`;
+        if (noMatchCount > 0) msg += `\n${noMatchCount} veckor saknade motsvarande öppet pass.`;
+        if (conflictCount > 0) msg += `\n${conflictCount} veckor hoppades över (krock med befintligt pass).`;
+        setTimeout(() => alert(msg), 50);
+      }
+      closePicker();
+      renderWeekTabs();
+      renderRotatedSchedule();
+      return;
     }
-    // Om refen inte hittades, fortsätt som vanligt (skapa nytt)
+    // Om inget öppet pass hittades alls, fortsätt som vanligt (skapa nytt)
   }
 
   // Kolla i nuvarande vecka om personen redan har pass den dagen
