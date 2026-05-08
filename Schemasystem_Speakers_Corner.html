@@ -7054,57 +7054,9 @@
     <div class="weather-loading" id="weatherLoading"></div>
   </div>
 
-  <!-- ============ KONTROLL & SAMMANFATTNING ============ -->
-  <div class="period-summary-section" id="periodSummarySection">
-    <div class="ps-head">
-      <div>
-        <h3 class="ps-title">Sammanfattning över perioden <span class="accent">— kontroll innan export</span></h3>
-        <div class="ps-sub" id="psSub">— ingen schema genererad ännu</div>
-      </div>
-      <div class="ps-stats" id="psStats">
-        <!-- summa-pills renderas av JS -->
-      </div>
-    </div>
-    
-    <!-- Empty state — visas när inget schema genererats -->
-    <div class="ps-empty-state" id="psEmptyState">
-      <div class="ps-empty-icon">◐</div>
-      <div class="ps-empty-title">Inget schema att granska ännu</div>
-      <div class="ps-empty-text">
-        För att skapa ett schema:<br>
-        <span class="ps-empty-step"><strong>1.</strong> Sätt upp veckomallen i Veckomall-steget</span>
-        <span class="ps-empty-step"><strong>2.</strong> Klicka <strong>"Generera schema med AI"</strong></span>
-      </div>
-      <button class="btn btn-primary ps-empty-cta" onclick="goStep(3)">‹ Gå till Veckomall</button>
-    </div>
-    
-    <!-- Tabell — visas när schema finns -->
-    <div class="ps-table-wrap" id="psTableWrap" style="display:none;">
-      <table class="ps-table" id="psTable">
-        <thead>
-          <tr>
-            <th class="ps-col-name">Anställd</th>
-            <th class="ps-col-type">Typ</th>
-            <th class="ps-col-contract">Kontrakt</th>
-            <th class="ps-col-period">Period</th>
-            <th class="ps-col-planned">Planerat</th>
-            <th class="ps-col-diff">Avvikelse</th>
-            <th class="ps-col-status">Status</th>
-            <th class="ps-col-cost">Kostnad</th>
-          </tr>
-        </thead>
-        <tbody id="psTableBody"><!-- rader renderas av JS --></tbody>
-      </table>
-    </div>
-    <div class="ps-footer" id="psFooter"><!-- summary text --></div>
-  </div>
-
   <div class="action-bar">
     <button class="btn" onclick="goStep(3)">‹ Tillbaka</button>
-    <div style="display:flex; gap:8px;">
-      <button class="btn" onclick="manualSaveSchedule()" title="Spara denna version i historik (max 30 sparas)">💾 Spara denna version</button>
-      <button class="btn btn-primary" onclick="goStep(5)">Exportera ›</button>
-    </div>
+    <button class="btn btn-primary" onclick="goStep(5)">Exportera ›</button>
   </div>
 </div>
 
@@ -7132,8 +7084,11 @@
         <h3 class="saved-schedules-title">Sparade scheman <span class="accent">— historik</span></h3>
         <div class="saved-schedules-sub" id="savedSchedulesSub">— inga sparade ännu</div>
       </div>
-      <div class="saved-schedules-info">
-        Max 30 sparas per restaurang. Auto-sparade rensas först.
+      <div style="display:flex; gap:12px; align-items:center;">
+        <div class="saved-schedules-info">
+          Max 30 sparas per restaurang. Auto-sparade rensas först.
+        </div>
+        <button class="btn btn-primary" onclick="manualSaveSchedule()" title="Spara denna version i historik">💾 Spara denna version</button>
       </div>
     </div>
     <div class="saved-schedules-list" id="savedSchedulesList"><!-- renderas av JS --></div>
@@ -7167,6 +7122,33 @@
 </div>
 
 </main>
+
+<!-- ============ SPARA-VERSION-MODAL (steg 5) ============ -->
+<div class="gen-modal-overlay" id="saveScheduleModalOverlay">
+  <div class="gen-modal" style="width: 460px;">
+    <div class="gen-modal-head">
+      <div class="gen-modal-icon">💾</div>
+      <div>
+        <div class="gen-modal-title">Vill du spara denna versionen?</div>
+        <div class="gen-modal-sub">Sparas i historik per restaurang</div>
+      </div>
+    </div>
+    <div class="gen-modal-body">
+      <div style="margin-bottom: 14px;">
+        <label class="bb-period-label">Namn på versionen</label>
+        <input type="text" class="bb-period-input" id="saveScheduleNameInput" style="width: 100%;" placeholder="v.18–v.25">
+        <div class="bb-period-hint" style="margin-top: 6px;">Auto-döpt efter veckointervallet — du kan ändra om du vill</div>
+      </div>
+      <div class="gen-modal-question" id="saveSchedulePreview" style="font-size: 12px;">
+        <span id="saveScheduleStats">—</span>
+      </div>
+    </div>
+    <div class="gen-modal-foot">
+      <button class="btn" onclick="saveScheduleModalCancel()">Avbryt</button>
+      <button class="btn btn-primary" onclick="saveScheduleModalConfirm()">Spara version ›</button>
+    </div>
+  </div>
+</div>
 
 <!-- ============ STARTDATUM-MODAL (visas vid byte till steg 2) ============ -->
 <div class="gen-modal-overlay" id="startDateModalOverlay">
@@ -11048,7 +11030,7 @@ function buildExportRows() {
 function downloadExcel() {
   const rows = buildExportRows();
   if (rows.length === 0) {
-    alert('Inga pass att exportera. Generera ett schema först (steg 3).');
+    alert('Inga pass att exportera. Generera ett schema först (steg 4).');
     return;
   }
   
@@ -11218,7 +11200,7 @@ function downloadExcel() {
 
 function downloadCSV() {
   const rows = buildExportRows();
-  if (rows.length === 0) { alert('Inga pass att exportera. Generera ett schema först (steg 3).'); return; }
+  if (rows.length === 0) { alert('Inga pass att exportera. Generera ett schema först (steg 4).'); return; }
   
   const headers = Object.keys(rows[0]);
   let csv = '\uFEFF'; // BOM for Excel UTF-8
@@ -11249,7 +11231,7 @@ function downloadCSV() {
 
 function downloadHTML() {
   if (!periodWeeks || periodWeeks.length === 0) {
-    alert('Inga pass att skriva ut. Generera ett schema först (steg 3).');
+    alert('Inga pass att skriva ut. Generera ett schema först (steg 4).');
     return;
   }
   
@@ -13778,17 +13760,51 @@ function saveScheduleSnapshot(opts = {}) {
 // Manuell spara — frågar efter namn (default: periodLabel)
 function manualSaveSchedule() {
   if (!periodWeeks || periodWeeks.length === 0) {
-    alert('Inget schema att spara. Generera ett först i steg 2.');
+    alert('Inget schema att spara. Generera ett först i steg 4.');
     return;
   }
-  const defaultName = generateScheduleName(periodWeeks);
-  const name = prompt('Namn på sparad version:', defaultName);
-  if (name === null) return; // avbruten
-  const trimmed = name.trim() || defaultName;
-  const snap = saveScheduleSnapshot({ auto: false, name: trimmed });
-  if (snap) {
-    alert(`✓ Sparat som "${trimmed}"\n\nDu hittar det i Exportera-fliken under "Sparade scheman".`);
+  const overlay = document.getElementById('saveScheduleModalOverlay');
+  const input = document.getElementById('saveScheduleNameInput');
+  const statsEl = document.getElementById('saveScheduleStats');
+  if (!overlay || !input) {
+    // Fallback om modalen inte finns
+    const defaultName = generateScheduleName(periodWeeks);
+    const snap = saveScheduleSnapshot({ auto: false, name: defaultName });
+    if (snap) alert(`✓ Sparat som "${defaultName}"`);
+    return;
   }
+
+  const defaultName = generateScheduleName(periodWeeks);
+  input.value = defaultName;
+
+  // Visa statistik om schemat
+  if (statsEl) {
+    const stats = (typeof computeScheduleStats === 'function') ? computeScheduleStats(periodWeeks) : null;
+    const wkCount = periodWeeks.length;
+    const passText = stats ? `${stats.totalShifts} pass` : '';
+    const openText = stats && stats.openShifts > 0 ? ` · ⚠ ${stats.openShifts} öppna` : '';
+    statsEl.innerHTML = `<strong>${wkCount} veckor</strong>${passText ? ' · ' + passText : ''}${openText}`;
+  }
+
+  overlay.classList.add('open');
+  setTimeout(() => input.select(), 50);
+}
+
+function saveScheduleModalConfirm() {
+  const input = document.getElementById('saveScheduleNameInput');
+  const overlay = document.getElementById('saveScheduleModalOverlay');
+  if (!input) return;
+  const defaultName = generateScheduleName(periodWeeks);
+  const trimmed = (input.value || '').trim() || defaultName;
+  const snap = saveScheduleSnapshot({ auto: false, name: trimmed });
+  if (overlay) overlay.classList.remove('open');
+  if (snap && typeof renderSavedSchedules === 'function') renderSavedSchedules();
+  if (!snap) alert('Kunde inte spara — försök igen.');
+}
+
+function saveScheduleModalCancel() {
+  const overlay = document.getElementById('saveScheduleModalOverlay');
+  if (overlay) overlay.classList.remove('open');
 }
 
 // Lista alla sparade scheman för aktiv restaurang
@@ -13846,7 +13862,7 @@ function renderSavedSchedules() {
   if (saved.length === 0) {
     list.innerHTML = `<div class="saved-schedules-empty">
       Inga sparade scheman ännu.<br>
-      Klicka "💾 Spara denna version" i steg 3, eller generera ett nytt schema.
+      Klicka "💾 Spara denna version" här i steg 5, eller generera ett nytt schema i steg 4.
     </div>`;
     return;
   }
