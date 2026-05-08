@@ -2321,6 +2321,76 @@
     letter-spacing: 0.06em;
     font-style: italic;
   }
+  /* Schemaregler-toggles i gen-modalen */
+  .gen-rules-list {
+    background: var(--bg-paper);
+    border: 1px solid var(--line);
+    border-radius: 1px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .gen-rule-row {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 10px;
+    background: var(--bg);
+    border-left: 3px solid var(--ok);
+    border-radius: 1px;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .gen-rule-row:hover { background: var(--bg-paper); }
+  .gen-rule-row.is-off {
+    border-left-color: var(--line);
+    opacity: 0.55;
+  }
+  .gen-rule-row.is-hard { border-left-color: var(--accent); cursor: default; }
+  .gen-rule-row.is-hard:hover { background: var(--bg); }
+  .gen-rule-icon {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--ok);
+    color: white;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .gen-rule-row.is-off .gen-rule-icon { background: var(--ink-faint); }
+  .gen-rule-row.is-hard .gen-rule-icon { background: var(--accent); }
+  .gen-rule-text { min-width: 0; }
+  .gen-rule-title {
+    font-family: 'Fraunces', serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.2;
+  }
+  .gen-rule-row.is-off .gen-rule-title { color: var(--ink-soft); }
+  .gen-rule-detail {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 2px;
+  }
+  .gen-rule-toggle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 4px 10px;
+    border-radius: 1px;
+    background: var(--ok);
+    color: white;
+  }
+  .gen-rule-row.is-off .gen-rule-toggle { background: var(--ink-faint); }
+  .gen-rule-row.is-hard .gen-rule-toggle { background: var(--accent); }
   .gen-modal-question {
     background: rgba(184,65,14,0.06);
     border-left: 3px solid var(--accent);
@@ -8057,6 +8127,14 @@
         </div>
       </div>
       
+      <div class="gen-modal-section">
+        <div class="gen-modal-section-head">
+          <span class="gen-modal-section-title">Schemaregler</span>
+          <span class="gen-modal-section-meta" id="genModalRulesMeta">— aktiva</span>
+        </div>
+        <div class="gen-rules-list" id="genModalRulesList"></div>
+      </div>
+
       <div class="gen-modal-section">
         <div class="gen-modal-section-head">
           <span class="gen-modal-section-title">Registrerad frånvaro i perioden</span>
@@ -14368,17 +14446,58 @@ function calcPreferenceScore(emp, slot, dayIdx, weekShifts, weekIdx, allWeeklySh
   if (prefs.weekendsOnly && !isWeekend) score -= 5;
   if (prefs.weekendsOnly && isWeekend) score += 2;
 
-  // Varannan helg — defaultbeteende:
-  // Om personen redan jobbade förra veckans helg (lör eller sön), undvik att ge dem
-  // även denna helg. weekendsOnly överrider (då vill de ha alla helger).
-  // Användaren kan opt-out genom att sätta everyOtherWeekend === false explicit.
-  const eowEnabled = prefs.everyOtherWeekend !== false && !prefs.weekendsOnly;
+  // Globala schemaregler — kan slås av/på via scheduleRules-objektet
+  const rules = (typeof scheduleRules !== 'undefined') ? scheduleRules : { varannanHelg: true, mixDagKvall: true, spreadOBShifts: true };
+
+  // Varannan helg — straffa två helger i rad
+  // weekendsOnly överrider (de vill ha alla helger). everyOtherWeekend===false opt-out per person.
+  const eowEnabled = rules.varannanHelg && prefs.everyOtherWeekend !== false && !prefs.weekendsOnly;
   if (eowEnabled && isWeekend && typeof weekIdx === 'number' && weekIdx > 0 && allWeeklyShifts) {
     const prevWeek = allWeeklyShifts[weekIdx - 1];
     if (prevWeek) {
       const workedPrevWeekend = [(prevWeek[5] || []), (prevWeek[6] || [])]
         .some(daysShifts => daysShifts.some(s => s.i === emp.initials));
-      if (workedPrevWeekend) score -= 6; // tung penalty — försök ge åt nån annan
+      if (workedPrevWeekend) score -= 6;
+    }
+  }
+
+  // Mixa dag + kväll — om personen jobbade BARA kvällar förra veckan, ge mer
+  // dag-pass denna vecka istället för fler kvällar
+  if (rules.mixDagKvall && typeof weekIdx === 'number' && weekIdx > 0 && allWeeklyShifts) {
+    const prevWeek = allWeeklyShifts[weekIdx - 1];
+    if (prevWeek) {
+      let prevDayShifts = 0;
+      let prevEveShifts = 0;
+      for (let d = 0; d < 7; d++) {
+        (prevWeek[d] || []).forEach(s => {
+          if (s.i !== emp.initials) return;
+          const sh = parseInt((s.s || '00:00').split(':')[0]);
+          if (sh < 14) prevDayShifts++;
+          else prevEveShifts++;
+        });
+      }
+      // Bara kvällar förra veckan (3+ kvällspass och inga dagpass)
+      if (prevEveShifts >= 3 && prevDayShifts === 0) {
+        if (isEveningShift) score -= 4;  // undvik fler kvällar
+        if (isDayShift) score += 2;       // föredra dagpass
+      }
+    }
+  }
+
+  // Sprid OB-pass — penalty om personen redan har många OB-pass denna vecka
+  if (rules.spreadOBShifts && weekShifts) {
+    let obShiftsThisWeek = 0;
+    const isObSlot = isWeekend || startHour >= 18 || startHour < 6;
+    if (isObSlot) {
+      for (let d = 0; d < 7; d++) {
+        (weekShifts[d] || []).forEach(s => {
+          if (s.i !== emp.initials) return;
+          const sh = parseInt((s.s || '00:00').split(':')[0]);
+          // OB ≈ helg eller kväll (≥18) eller natt
+          if (d >= 5 || sh >= 18 || sh < 6) obShiftsThisWeek++;
+        });
+      }
+      if (obShiftsThisWeek >= 2) score -= obShiftsThisWeek * 1.5;
     }
   }
   
@@ -15617,6 +15736,73 @@ function hideAILoader() {
   if (overlay) overlay.classList.remove('open');
 }
 
+// =========== SCHEMAREGLER (globala mjuka/hårda regler för algoritmen) ===========
+const SCHEDULE_RULE_DEFAULTS = {
+  varannanHelg: true,        // straffa två helger i rad för samma person
+  mixDagKvall: true,         // ej bara kvällar 2 veckor i rad
+  spreadOBShifts: true,      // sprid OB-tunga pass jämnt över personalen
+};
+const HARD_RULES = [
+  { key: '_rest11', title: '11h vila mellan pass', detail: 'Arbetstidslagen — kan inte stängas av' },
+  { key: '_max13',  title: 'Max 13h pass utan dispens', detail: 'Hård regel — kräver godkännande för längre' },
+];
+
+let scheduleRules = { ...SCHEDULE_RULE_DEFAULTS };
+try {
+  const saved = localStorage.getItem('schemasystem_scheduleRules');
+  if (saved) scheduleRules = { ...SCHEDULE_RULE_DEFAULTS, ...JSON.parse(saved) };
+} catch (e) { /* ignore */ }
+
+function persistScheduleRules() {
+  try { localStorage.setItem('schemasystem_scheduleRules', JSON.stringify(scheduleRules)); } catch (e) {}
+}
+
+const SCHEDULE_RULE_DEFINITIONS = [
+  { key: 'varannanHelg', title: 'Varannan helg', detail: 'Samma person får inte två helger i rad' },
+  { key: 'mixDagKvall',  title: 'Mixa dag + kväll', detail: 'Ej bara kvällspass två veckor i rad' },
+  { key: 'spreadOBShifts', title: 'Sprid OB-pass', detail: 'Fördela natt/helg-pass jämnt mellan personalen' },
+];
+
+function renderScheduleRules() {
+  const list = document.getElementById('genModalRulesList');
+  const meta = document.getElementById('genModalRulesMeta');
+  if (!list) return;
+  let activeCount = HARD_RULES.length; // hårda regler räknas som alltid på
+  let html = '';
+  // Hårda regler först
+  HARD_RULES.forEach(r => {
+    html += `<div class="gen-rule-row is-hard">
+      <div class="gen-rule-icon">⚖</div>
+      <div class="gen-rule-text">
+        <div class="gen-rule-title">${r.title}</div>
+        <div class="gen-rule-detail">${r.detail}</div>
+      </div>
+      <div class="gen-rule-toggle">Hård</div>
+    </div>`;
+  });
+  // Mjuka regler — togglebara
+  SCHEDULE_RULE_DEFINITIONS.forEach(r => {
+    const on = !!scheduleRules[r.key];
+    if (on) activeCount++;
+    html += `<div class="gen-rule-row ${on ? '' : 'is-off'}" onclick="toggleScheduleRule('${r.key}')">
+      <div class="gen-rule-icon">${on ? '✓' : '○'}</div>
+      <div class="gen-rule-text">
+        <div class="gen-rule-title">${r.title}</div>
+        <div class="gen-rule-detail">${r.detail}</div>
+      </div>
+      <div class="gen-rule-toggle">${on ? 'På' : 'Av'}</div>
+    </div>`;
+  });
+  list.innerHTML = html;
+  if (meta) meta.textContent = `${activeCount} av ${HARD_RULES.length + SCHEDULE_RULE_DEFINITIONS.length} aktiva`;
+}
+
+function toggleScheduleRule(key) {
+  scheduleRules[key] = !scheduleRules[key];
+  persistScheduleRules();
+  renderScheduleRules();
+}
+
 // =========== GENERERA-BEKRÄFTELSE MODAL ===========
 let _genModalResolver = null;
 let _genModalContext = null; // { periodStartISO, periodEndISO }
@@ -15628,6 +15814,7 @@ function showGenerateConfirmModal({ periodLabel, weeks, employeeCount, periodSta
     document.getElementById('genModalPeriod').textContent = periodLabel;
     document.getElementById('genModalWeeks').textContent = `${weeks} veckor`;
     document.getElementById('genModalEmpCount').textContent = employeeCount;
+    if (typeof renderScheduleRules === 'function') renderScheduleRules();
     genModalRefreshAbsences();
     document.getElementById('genModalOverlay').classList.add('open');
   });
