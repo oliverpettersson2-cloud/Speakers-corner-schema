@@ -2183,6 +2183,91 @@
     letter-spacing: 0;
     font-style: italic;
   }
+  /* Spara-modal: kontrakttim-lista och regelbrott */
+  .save-contract-list, .save-rules-list {
+    background: var(--bg-paper);
+    border: 1px solid var(--line);
+    border-radius: 1px;
+    padding: 6px;
+    max-height: 180px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .save-contract-row {
+    display: grid;
+    grid-template-columns: 38px 1fr auto auto;
+    gap: 10px;
+    align-items: center;
+    padding: 6px 10px;
+    background: var(--bg);
+    border-left: 3px solid var(--line);
+    border-radius: 1px;
+    font-size: 12px;
+  }
+  .save-contract-row.status-ok { border-left-color: var(--ok); }
+  .save-contract-row.status-warn { border-left-color: var(--warn); background: rgba(168,107,0,0.05); }
+  .save-contract-row.status-err { border-left-color: var(--err); background: rgba(139,26,26,0.05); }
+  .save-contract-row.status-flex { border-left-color: var(--ink-faint); opacity: 0.85; }
+  .save-contract-ini {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .save-contract-info {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+  .save-contract-hours {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .save-contract-diff {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 1px;
+    min-width: 52px;
+    text-align: center;
+  }
+  .save-contract-diff.ok { background: rgba(94,134,80,0.15); color: var(--ok); }
+  .save-contract-diff.warn { background: rgba(168,107,0,0.15); color: var(--warn); }
+  .save-contract-diff.err { background: rgba(139,26,26,0.15); color: var(--err); }
+  .save-contract-diff.flex { background: rgba(0,0,0,0.06); color: var(--ink-faint); }
+
+  .save-rule-row {
+    display: grid;
+    grid-template-columns: 26px 1fr;
+    gap: 10px;
+    padding: 6px 10px;
+    background: var(--bg);
+    border-left: 3px solid var(--err);
+    border-radius: 1px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    align-items: center;
+  }
+  .save-rule-row.warn { border-left-color: var(--warn); }
+  .save-rule-icon { font-size: 14px; }
+  .save-rule-row.err .save-rule-icon { color: var(--err); }
+  .save-rule-row.warn .save-rule-icon { color: var(--warn); }
+  .save-rule-empty, .save-contract-empty {
+    text-align: center;
+    padding: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ok);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
   .gen-modal-foot {
     padding: 16px 26px;
     border-top: 1px solid var(--line-soft);
@@ -7655,26 +7740,40 @@
 
 <!-- ============ SPARA-VERSION-MODAL (steg 5) ============ -->
 <div class="gen-modal-overlay" id="saveScheduleModalOverlay">
-  <div class="gen-modal" style="width: 460px;">
+  <div class="gen-modal" style="width: 540px; max-height: 88vh;">
     <div class="gen-modal-head">
       <div class="gen-modal-icon">💾</div>
       <div>
         <div class="gen-modal-title">Vill du spara denna versionen?</div>
-        <div class="gen-modal-sub">Sparas i historik per restaurang</div>
+        <div class="gen-modal-sub" id="saveScheduleStats">Sparas i historik per restaurang</div>
       </div>
     </div>
     <div class="gen-modal-body">
-      <div style="margin-bottom: 14px;">
+      <!-- Kontrakttim-status per anställd -->
+      <div class="gen-modal-section">
+        <div class="gen-modal-section-head">
+          <span class="gen-modal-section-title">Kontrakt­timmar</span>
+          <span class="gen-modal-section-meta" id="saveContractMeta">— st</span>
+        </div>
+        <div class="save-contract-list" id="saveContractList"></div>
+      </div>
+      <!-- Regelbrott -->
+      <div class="gen-modal-section">
+        <div class="gen-modal-section-head">
+          <span class="gen-modal-section-title">Regelbrott &amp; varningar</span>
+          <span class="gen-modal-section-meta" id="saveRulesMeta">— st</span>
+        </div>
+        <div class="save-rules-list" id="saveRulesList"></div>
+      </div>
+      <!-- Namn -->
+      <div style="margin-top: 6px;">
         <label class="bb-period-label">Namn på versionen</label>
         <input type="text" class="bb-period-input" id="saveScheduleNameInput" style="width: 100%;" placeholder="v.18–v.25">
         <div class="bb-period-hint" style="margin-top: 6px;">Auto-döpt efter veckointervallet — du kan ändra om du vill</div>
       </div>
-      <div class="gen-modal-question" id="saveSchedulePreview" style="font-size: 12px;">
-        <span id="saveScheduleStats">—</span>
-      </div>
     </div>
     <div class="gen-modal-foot">
-      <button class="btn" onclick="saveScheduleModalCancel()">Avbryt</button>
+      <button class="btn" onclick="saveScheduleModalCancel()">Hoppa över</button>
       <button class="btn btn-primary" onclick="saveScheduleModalConfirm()">Spara version ›</button>
     </div>
   </div>
@@ -8778,6 +8877,11 @@ function goStep(n) {
       if (typeof renderExportPreview === 'function') renderExportPreview();
       if (typeof renderSavedSchedules === 'function') {
         setTimeout(renderSavedSchedules, 0);
+      }
+      // Auto-öppna spara-modalen så användaren bekräftar versionen + ser
+      // kontrakttim-status och regelbrott innan export
+      if (typeof manualSaveSchedule === 'function' && periodWeeks && periodWeeks.length > 0) {
+        setTimeout(manualSaveSchedule, 200);
       }
       break;
   }
@@ -14510,32 +14614,144 @@ function saveScheduleSnapshot(opts = {}) {
 }
 
 // Manuell spara — frågar efter namn (default: periodLabel)
+// Räkna regelbrott i hela perioden — pass över 13h + < 11h vila mellan dagar
+function computeRuleBreaks() {
+  const breaks = [];
+  if (!periodWeeks || periodWeeks.length === 0) return breaks;
+  const dayShort = ['Mån','Tis','Ons','Tor','Fre','Lör','Sön'];
+
+  periodWeeks.forEach(wk => {
+    if (!wk.shifts) return;
+    for (let d = 0; d < 7; d++) {
+      const shifts = wk.shifts[d] || [];
+      shifts.forEach(s => {
+        if (s.i === OPEN_SHIFT_MARKER) return;
+        // Pass över 13h
+        try {
+          const dur = shiftDuration(s);
+          if (dur > 13) {
+            breaks.push({
+              type: 'long_shift',
+              severity: 'err',
+              text: `${s.i} v.${wk.weekNum} ${dayShort[d]} ${s.s}–${s.e} = ${dur.toFixed(1)}h (>13h kräver dispens)`,
+            });
+          }
+        } catch(e) {}
+        // < 11h vila sedan föregående pass (samma vecka, dagen innan)
+        if (d > 0) {
+          const prevDay = wk.shifts[d - 1] || [];
+          const prevShift = prevDay.find(p => p.i === s.i);
+          if (prevShift) {
+            try {
+              const [pe_h, pe_m] = prevShift.e.split(':').map(Number);
+              const [ps_h] = prevShift.s.split(':').map(Number);
+              const [ns_h, ns_m] = s.s.split(':').map(Number);
+              let prevEndMin = pe_h * 60 + pe_m;
+              if (pe_h < ps_h) prevEndMin += 24 * 60; // över midnatt
+              const newStartMin = ns_h * 60 + ns_m + 24 * 60;
+              const restHours = (newStartMin - prevEndMin) / 60;
+              if (restHours < 11) {
+                breaks.push({
+                  type: 'short_rest',
+                  severity: 'err',
+                  text: `${s.i} v.${wk.weekNum} ${dayShort[d-1]}→${dayShort[d]}: bara ${restHours.toFixed(1)}h vila (<11h)`,
+                });
+              }
+            } catch(e) {}
+          }
+        }
+      });
+    }
+  });
+
+  return breaks;
+}
+
 function manualSaveSchedule() {
   if (!periodWeeks || periodWeeks.length === 0) {
-    alert('Inget schema att spara. Generera ett först i steg 4.');
+    showToast({ title: 'Inget schema att spara', detail: 'Generera ett först i steg 4', type: 'warn' });
     return;
   }
   const overlay = document.getElementById('saveScheduleModalOverlay');
   const input = document.getElementById('saveScheduleNameInput');
   const statsEl = document.getElementById('saveScheduleStats');
   if (!overlay || !input) {
-    // Fallback om modalen inte finns
     const defaultName = generateScheduleName(periodWeeks);
     const snap = saveScheduleSnapshot({ auto: false, name: defaultName });
-    if (snap) alert(`✓ Sparat som "${defaultName}"`);
+    if (snap) showToast({ title: `Sparat som "${defaultName}"`, type: 'success' });
     return;
   }
 
   const defaultName = generateScheduleName(periodWeeks);
   input.value = defaultName;
 
-  // Visa statistik om schemat
-  if (statsEl) {
-    const stats = (typeof computeScheduleStats === 'function') ? computeScheduleStats(periodWeeks) : null;
-    const wkCount = periodWeeks.length;
-    const passText = stats ? `${stats.totalShifts} pass` : '';
-    const openText = stats && stats.openShifts > 0 ? ` · ⚠ ${stats.openShifts} öppna` : '';
-    statsEl.innerHTML = `<strong>${wkCount} veckor</strong>${passText ? ' · ' + passText : ''}${openText}`;
+  // Top-stat-rad
+  const stats = (typeof computeScheduleStats === 'function') ? computeScheduleStats(periodWeeks) : null;
+  const wkCount = periodWeeks.length;
+  const passText = stats ? `${stats.totalShifts} pass` : '';
+  const openText = stats && stats.openShifts > 0 ? ` · ⚠ ${stats.openShifts} öppna` : '';
+  if (statsEl) statsEl.textContent = `${wkCount} veckor${passText ? ' · ' + passText : ''}${openText}`;
+
+  // Kontrakttim-lista per anställd
+  const summary = (typeof computePeriodSummaryData === 'function') ? computePeriodSummaryData() : null;
+  const contractList = document.getElementById('saveContractList');
+  const contractMeta = document.getElementById('saveContractMeta');
+  if (contractList && summary) {
+    let okCount = 0, warnCount = 0, errCount = 0, flexCount = 0;
+    const rows = summary.employees.map(e => {
+      const emp = e.emp;
+      const hoursStr = e.hoursPlanned.toFixed(1) + 'h';
+      let diffLabel, diffCls, infoStr;
+      if (e.isFlex) {
+        diffLabel = 'FLEX';
+        diffCls = 'flex';
+        infoStr = `${emp.type} · ingen kontraktstim`;
+        flexCount++;
+      } else {
+        const target = e.periodContractHours.toFixed(0);
+        infoStr = `${emp.type} · mål ${target}h`;
+        const pct = e.diffPct;
+        const sign = pct >= 0 ? '+' : '';
+        diffLabel = `${sign}${pct.toFixed(0)}%`;
+        if (e.status === 'ok') { diffCls = 'ok'; okCount++; }
+        else if (e.status === 'warn') { diffCls = 'warn'; warnCount++; }
+        else { diffCls = 'err'; errCount++; }
+      }
+      return `<div class="save-contract-row status-${e.status}">
+        <span class="save-contract-ini">${emp.initials}</span>
+        <span class="save-contract-info">${infoStr}</span>
+        <span class="save-contract-hours">${hoursStr}</span>
+        <span class="save-contract-diff ${diffCls}">${diffLabel}</span>
+      </div>`;
+    });
+    contractList.innerHTML = rows.length > 0
+      ? rows.join('')
+      : `<div class="save-contract-empty">Inga anställda</div>`;
+    if (contractMeta) {
+      const parts = [];
+      if (errCount > 0) parts.push(`${errCount} avvikelse`);
+      if (warnCount > 0) parts.push(`${warnCount} granska`);
+      if (okCount > 0) parts.push(`${okCount} ok`);
+      if (flexCount > 0) parts.push(`${flexCount} flex`);
+      contractMeta.textContent = parts.join(' · ') || '—';
+    }
+  }
+
+  // Regelbrott
+  const ruleList = document.getElementById('saveRulesList');
+  const ruleMeta = document.getElementById('saveRulesMeta');
+  const breaks = computeRuleBreaks();
+  if (ruleList) {
+    if (breaks.length === 0) {
+      ruleList.innerHTML = `<div class="save-rule-empty">✓ Inga regelbrott upptäckta</div>`;
+      if (ruleMeta) ruleMeta.textContent = 'inga';
+    } else {
+      ruleList.innerHTML = breaks.map(b => `<div class="save-rule-row ${b.severity}">
+        <span class="save-rule-icon">⚠</span>
+        <span>${b.text}</span>
+      </div>`).join('');
+      if (ruleMeta) ruleMeta.textContent = `${breaks.length} st`;
+    }
   }
 
   overlay.classList.add('open');
