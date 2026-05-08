@@ -7391,6 +7391,26 @@
 
 </main>
 
+<!-- ============ CONFIRM DIALOG ============ -->
+<div class="gen-modal-overlay" id="confirmDialogOverlay">
+  <div class="gen-modal" style="width: 440px;">
+    <div class="gen-modal-head">
+      <div class="gen-modal-icon" id="confirmDialogIcon">?</div>
+      <div>
+        <div class="gen-modal-title" id="confirmDialogTitle">Bekräfta</div>
+        <div class="gen-modal-sub" id="confirmDialogSub">— vill du fortsätta?</div>
+      </div>
+    </div>
+    <div class="gen-modal-body">
+      <div id="confirmDialogMessage" style="font-family:'Fraunces',serif; font-size:14px; line-height:1.5; color:var(--ink); white-space:pre-wrap;"></div>
+    </div>
+    <div class="gen-modal-foot">
+      <button type="button" class="btn" id="confirmDialogCancel" onclick="_confirmDialogResolve(false)">Avbryt</button>
+      <button type="button" class="btn btn-primary" id="confirmDialogConfirm" onclick="_confirmDialogResolve(true)">Bekräfta</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ TOAST-CONTAINER ============ -->
 <div class="toast-stack" id="toastStack"></div>
 
@@ -9528,10 +9548,17 @@ function addNewPerson() {
   openAddEmpModal('DEL');
 }
 
-function removePerson(initials) {
+async function removePerson(initials) {
   const emp = employees.find(e => e.initials === initials);
   if (!emp) return;
-  if (!confirm(`Ta bort ${emp.initials}?\n\nAlla pass där ${emp.initials} jobbar tas också bort.`)) return;
+  const proceed = await showConfirm({
+    title: `Ta bort ${emp.initials}?`,
+    sub: '— alla deras pass tas också bort',
+    message: `Anställd "${emp.initials}" tas bort permanent. Alla pass där ${emp.initials} jobbar försvinner från schemat.`,
+    confirmText: 'Ta bort',
+    type: 'danger',
+  });
+  if (!proceed) return;
   
   const idx = employees.findIndex(e => e.initials === initials);
   if (idx >= 0) employees.splice(idx, 1);
@@ -10561,10 +10588,17 @@ function saveShift() {
   renderRotatedSchedule();
 }
 
-function deleteShift() {
+async function deleteShift() {
   if (modalState.isNew) return;
-  if (!confirm('Ta bort pass?')) return;
-  
+  const proceed = await showConfirm({
+    title: 'Ta bort pass?',
+    sub: '— passet försvinner från schemat',
+    message: 'Är du säker på att du vill ta bort detta pass?',
+    confirmText: 'Ta bort',
+    type: 'danger',
+  });
+  if (!proceed) return;
+
   const applyTo = document.getElementById('modalApplyTo').value;
   const oldShift = currentWeekShifts()[modalState.day][modalState.shiftIdx];
   const targetWeeks = getTargetWeekIdxs(applyTo);
@@ -11127,8 +11161,15 @@ function renderPeriodView() {
   renderRotatedSchedule();
 }
 
-function resetAllWeeks() {
-  if (!confirm('Återställ alla 8 veckor till mallen? Alla manuella ändringar i perioden tas bort.')) return;
+async function resetAllWeeks() {
+  const proceed = await showConfirm({
+    title: 'Återställ alla veckor?',
+    sub: '— alla manuella ändringar tas bort',
+    message: 'Detta återställer alla veckor till veckomallen. Alla manuella ändringar du gjort i perioden försvinner.',
+    confirmText: 'Återställ',
+    type: 'danger',
+  });
+  if (!proceed) return;
   periodWeeks = buildPeriodWeeks();
   renderPeriodView();
 }
@@ -11204,9 +11245,16 @@ function savePeriodShift() {
   renderPeriodView();
 }
 
-function deletePeriodShift() {
+async function deletePeriodShift() {
   if (!periodModalState || periodModalState.isNew) return;
-  if (!confirm('Ta bort pass?')) return;
+  const proceed = await showConfirm({
+    title: 'Ta bort pass?',
+    sub: '— passet försvinner från schemat',
+    message: 'Är du säker på att du vill ta bort detta pass?',
+    confirmText: 'Ta bort',
+    type: 'danger',
+  });
+  if (!proceed) return;
   const wk = periodWeeks[periodModalState.weekIdx];
   wk.shifts[periodModalState.day].splice(periodModalState.shiftIdx, 1);
   wk.modified = true;
@@ -12455,16 +12503,16 @@ function selectCandidate(initials) {
   document.getElementById('pickerSaveBtn').disabled = false;
 }
 
-function confirmPicker() {
+async function confirmPicker() {
   if (!pickerState.selectedInitials) {
-    alert('Välj en person först.');
+    showToast({ title: 'Välj en person först', type: 'warn' });
     return;
   }
   const start = document.getElementById('pickerStart').value;
   const end = document.getElementById('pickerEnd').value;
   const applyTo = document.getElementById('pickerApplyTo').value;
   if (!start || !end) {
-    alert('Ange båda tider.');
+    showToast({ title: 'Ange båda tider', type: 'warn' });
     return;
   }
 
@@ -12485,52 +12533,67 @@ function confirmPicker() {
     const refStartMin = toMin(ref.start);
     const refEndMin = toMin(ref.end);
 
+    // Hjälp: hitta öppet pass-index i en veckas dag (exakt → fuzzy)
+    const findOpenIdx = (dayShifts) => {
+      let i = dayShifts.findIndex(s =>
+        s.i === OPEN_SHIFT_MARKER && s.s === ref.start && s.e === ref.end && s.dept === ref.dept
+      );
+      if (i >= 0) return i;
+      const candidates = dayShifts
+        .map((s, k) => ({ s, k }))
+        .filter(x => x.s.i === OPEN_SHIFT_MARKER && x.s.dept === ref.dept);
+      if (candidates.length === 0) return -1;
+      candidates.sort((a, b) => {
+        const dA = Math.abs(toMin(a.s.s) - refStartMin) + Math.abs(toMin(a.s.e) - refEndMin);
+        const dB = Math.abs(toMin(b.s.s) - refStartMin) + Math.abs(toMin(b.s.e) - refEndMin);
+        return dA - dB;
+      });
+      return candidates[0].k;
+    };
+
+    // Pre-check aktuell vecka för dubbelbokning — fråga via showConfirm UTANFÖR loopen
+    // (forEach + async/await funkar inte snyggt ihop)
+    const curWkShifts = periodWeeks[currentWeek]?.shifts;
+    if (curWkShifts && curWkShifts[ref.dayIdx]) {
+      const curIdx = findOpenIdx(curWkShifts[ref.dayIdx]);
+      if (curIdx >= 0) {
+        const existingForPerson = curWkShifts[ref.dayIdx].find((s, i) =>
+          i !== curIdx && s.i === pickerState.selectedInitials
+        );
+        if (existingForPerson) {
+          const proceed = await showConfirm({
+            title: 'Tilldela ändå?',
+            sub: '— person har redan ett pass denna dag',
+            message: `${pickerState.selectedInitials} har redan ett pass ${existingForPerson.s}–${existingForPerson.e} denna dag. Vill du tilldela det öppna passet ändå?`,
+            confirmText: 'Ja, tilldela',
+            type: 'warn',
+          });
+          if (!proceed) return;
+        }
+      }
+    }
+
     targetWeeks.forEach(wkIdx => {
       const wkShifts = periodWeeks[wkIdx]?.shifts;
       if (!wkShifts || !wkShifts[ref.dayIdx]) { noMatchCount++; return; }
 
       const dayShifts = wkShifts[ref.dayIdx];
 
-      // Tier 1: exakt match (samma dag, tid, avdelning)
-      let idx = dayShifts.findIndex(s =>
-        s.i === OPEN_SHIFT_MARKER && s.s === ref.start && s.e === ref.end && s.dept === ref.dept
-      );
-
-      // Tier 2: samma dag + avdelning, närmaste starttid (fuzzy match — hanterar veckor
-      // där tider justerats lite, t.ex. helgdag)
-      if (idx < 0) {
-        const candidates = dayShifts
-          .map((s, i) => ({ s, i }))
-          .filter(x => x.s.i === OPEN_SHIFT_MARKER && x.s.dept === ref.dept);
-        if (candidates.length > 0) {
-          // Välj den med minsta diff i start+slut
-          candidates.sort((a, b) => {
-            const dA = Math.abs(toMin(a.s.s) - refStartMin) + Math.abs(toMin(a.s.e) - refEndMin);
-            const dB = Math.abs(toMin(b.s.s) - refStartMin) + Math.abs(toMin(b.s.e) - refEndMin);
-            return dA - dB;
-          });
-          idx = candidates[0].i;
-        }
-      }
-
+      // Hitta matchande öppet pass (exakt → fuzzy via findOpenIdx)
+      const idx = findOpenIdx(dayShifts);
       if (idx < 0) {
         noMatchCount++;
         return;
       }
 
-      // Kontrollera dubbelbokning — fråga bara på aktuella veckan, hoppa över tyst på övriga
+      // Kontrollera dubbelbokning — current-week är redan pre-checkad ovan,
+      // andra veckor hoppas över tyst (räknas som conflict)
       const existingForPerson = dayShifts.find((s, i) =>
         i !== idx && s.i === pickerState.selectedInitials
       );
-      if (existingForPerson) {
-        if (wkIdx === currentWeek) {
-          if (!confirm(`${pickerState.selectedInitials} har redan ett pass denna dag (${existingForPerson.s}–${existingForPerson.e}). Tilldela ändå?`)) {
-            return;
-          }
-        } else {
-          conflictCount++;
-          return;
-        }
+      if (existingForPerson && wkIdx !== currentWeek) {
+        conflictCount++;
+        return;
       }
 
       // Ersätt öppet pass med tilldelad person — använd tiderna från det öppna passet
@@ -12579,9 +12642,14 @@ function confirmPicker() {
   // Kolla i nuvarande vecka om personen redan har pass den dagen
   const existing = (currentWeekShifts()[pickerState.day] || []).find(s => s.i === pickerState.selectedInitials);
   if (existing) {
-    if (!confirm(`${pickerState.selectedInitials} har redan ett pass denna dag (${existing.s}–${existing.e}). Lägg till ändå?`)) {
-      return;
-    }
+    const proceed = await showConfirm({
+      title: 'Lägg till ändå?',
+      sub: '— person har redan ett pass denna dag',
+      message: `${pickerState.selectedInitials} har redan ett pass ${existing.s}–${existing.e} denna dag. Lägg till det nya passet ändå?`,
+      confirmText: 'Ja, lägg till',
+      type: 'warn',
+    });
+    if (!proceed) return;
   }
   
   const newShift = {
@@ -13885,8 +13953,15 @@ function bbSaveOpeningModal() {
   bbRenderAll();
 }
 
-function bbReset() {
-  if (!confirm('Återställ alla bemanningsbehov till standardvärden?')) return;
+async function bbReset() {
+  const proceed = await showConfirm({
+    title: 'Återställ bemanningsbehov?',
+    sub: '— alla värden går tillbaka till standard',
+    message: 'Detta återställer alla bemanningsbehov och öppettider till standardvärdena.',
+    confirmText: 'Återställ',
+    type: 'danger',
+  });
+  if (!proceed) return;
   bbOpenings = JSON.parse(JSON.stringify(bbDefaultOpenings));
   bbNeed = JSON.parse(JSON.stringify(bbDefaultNeed));
   bbRenderAll();
@@ -14271,31 +14346,33 @@ function escapeHTML(str) {
 }
 
 // Handler — öppna sparat schema (med varning om osparat arbete)
-function handleLoadSchedule(snapshotId) {
-  // Varna om nuvarande schema inte är sparat
+async function handleLoadSchedule(snapshotId) {
   if (periodWeeks && periodWeeks.length > 0) {
-    const ok = confirm(
-      'Vill du verkligen öppna detta sparade schema?\n\n' +
-      'Det aktuella schemat i appen kommer ersättas.\n' +
-      'Om du inte sparat det manuellt kan det förloras.\n\n' +
-      '[OK] för att öppna · [Avbryt] för att stanna'
-    );
+    const ok = await showConfirm({
+      title: 'Öppna sparat schema?',
+      sub: '— aktuellt schema ersätts',
+      message: 'Det aktuella schemat i appen kommer ersättas. Om du inte sparat det manuellt kan det förloras.',
+      confirmText: 'Öppna',
+      type: 'warn',
+    });
     if (!ok) return;
   }
   const ok = loadSavedSchedule(snapshotId);
-  if (ok) {
-    // Hoppa till steg 4 (Schema) så användaren ser schemat
-    if (typeof goStep === 'function') goStep(4);
-  }
+  if (ok && typeof goStep === 'function') goStep(4);
 }
 
-// Handler — ta bort med bekräftelse
-function handleDeleteSchedule(snapshotId) {
+async function handleDeleteSchedule(snapshotId) {
   const restData = RESTAURANT_DATA[currentRestaurant];
   if (!restData) return;
   const snap = (restData.savedSchedules || []).find(s => s.id === snapshotId);
   if (!snap) return;
-  const ok = confirm(`Ta bort sparat schema "${snap.name}"?\n\nDetta kan inte ångras.`);
+  const ok = await showConfirm({
+    title: `Ta bort "${snap.name}"?`,
+    sub: '— detta kan inte ångras',
+    message: 'Det sparade schemat tas bort permanent från historiken.',
+    confirmText: 'Ta bort',
+    type: 'danger',
+  });
   if (!ok) return;
   deleteSavedSchedule(snapshotId);
   renderSavedSchedules();
@@ -14387,6 +14464,69 @@ let mallDept = 'all'; // 'all' | 'serv' | 'kok'
 
 // =========== KOSTNAD-BANNER (kollapsbar) ===========
 let _costBannerOpen = false;
+
+// =========== CONFIRM DIALOG ===========
+let _confirmDialogResolver = null;
+
+function showConfirm({
+  title = 'Bekräfta',
+  sub = '',
+  message = '',
+  confirmText = 'Bekräfta',
+  cancelText = 'Avbryt',
+  type = 'warn', // 'warn' | 'danger' | 'info'
+} = {}) {
+  return new Promise(resolve => {
+    _confirmDialogResolver = resolve;
+    document.getElementById('confirmDialogTitle').textContent = title;
+    document.getElementById('confirmDialogSub').textContent = sub || (type === 'danger' ? '— detta kan inte ångras' : '— vill du fortsätta?');
+    document.getElementById('confirmDialogMessage').textContent = message;
+    document.getElementById('confirmDialogConfirm').textContent = confirmText;
+    document.getElementById('confirmDialogCancel').textContent = cancelText;
+
+    const iconEl = document.getElementById('confirmDialogIcon');
+    const confirmBtn = document.getElementById('confirmDialogConfirm');
+    if (type === 'danger') {
+      iconEl.textContent = '⚠';
+      iconEl.style.background = 'var(--err)';
+      confirmBtn.style.background = 'var(--err)';
+      confirmBtn.style.borderColor = 'var(--err)';
+      confirmBtn.style.color = 'white';
+    } else if (type === 'info') {
+      iconEl.textContent = 'i';
+      iconEl.style.background = 'var(--accent)';
+      confirmBtn.style.background = '';
+      confirmBtn.style.borderColor = '';
+      confirmBtn.style.color = '';
+    } else {
+      iconEl.textContent = '?';
+      iconEl.style.background = 'var(--warn)';
+      confirmBtn.style.background = '';
+      confirmBtn.style.borderColor = '';
+      confirmBtn.style.color = '';
+    }
+
+    document.getElementById('confirmDialogOverlay').classList.add('open');
+  });
+}
+
+function _confirmDialogResolve(result) {
+  document.getElementById('confirmDialogOverlay').classList.remove('open');
+  if (_confirmDialogResolver) {
+    _confirmDialogResolver(result);
+    _confirmDialogResolver = null;
+  }
+}
+
+// Stäng vid klick på overlay (samma som Avbryt)
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('confirmDialogOverlay');
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) _confirmDialogResolve(false);
+    });
+  }
+});
 
 // =========== TOAST ===========
 // type: 'success' | 'warn' | 'error' | 'info'
@@ -14535,10 +14675,18 @@ function genModalConfirmAddAbsence() {
   genModalRefreshAbsences();
 }
 
-function genModalRemoveAbsence(initials, type, startDate, endDate) {
+async function genModalRemoveAbsence(initials, type, startDate, endDate) {
   const emp = employees.find(e => e.initials === initials);
   if (!emp || !Array.isArray(emp.absences)) return;
-  if (!confirm(`Ta bort ${type}-frånvaro för ${initials} (${startDate}–${endDate})?`)) return;
+  const typeLabel = (ABSENCE_TYPES[type] || ABSENCE_TYPES.ovrigt).label;
+  const ok = await showConfirm({
+    title: 'Ta bort frånvaro?',
+    sub: '— frånvaron försvinner från perioden',
+    message: `${typeLabel} för ${initials} (${startDate} – ${endDate}) tas bort.`,
+    confirmText: 'Ta bort',
+    type: 'danger',
+  });
+  if (!ok) return;
   emp.absences = emp.absences.filter(a =>
     !(a.type === type && a.startDate === startDate && a.endDate === endDate)
   );
@@ -14812,11 +14960,18 @@ function mallShiftModalSave() {
 }
 
 // Ta bort pass från modalen
-function mallShiftModalDelete() {
+async function mallShiftModalDelete() {
   if (!_mallModalState) return;
   const { pattern, dayIdx, shiftIdx } = _mallModalState;
   if (shiftIdx < 0) { mallShiftModalClose(); return; }
-  if (!confirm('Ta bort detta pass från mallen?')) return;
+  const ok = await showConfirm({
+    title: 'Ta bort pass från mallen?',
+    sub: '— påverkar alla veckor som följer mallen',
+    message: 'Passet tas bort från veckomallen. Befintliga genererade scheman påverkas inte förrän du genererar om.',
+    confirmText: 'Ta bort',
+    type: 'danger',
+  });
+  if (!ok) return;
   schedule[pattern][dayIdx].splice(shiftIdx, 1);
   mallShiftModalClose();
   renderMall();
