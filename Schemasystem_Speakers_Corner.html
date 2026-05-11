@@ -14852,8 +14852,15 @@ function calcPreferenceScore(emp, slot, dayIdx, weekShifts, weekIdx, allWeeklySh
 }
 
 function generateSchedulesForPeriod() {
-  const weeklyHoursTracker = {}; // { weekIdx: { initials: hours } }
-  const weeklyShifts = []; // [{ 0: [shifts], 1: [shifts], ... }, ...]
+  // REFAKTORERAD ALGORITM — lager-baserad istället för per-slot greedy
+  //
+  // OLD bug: gick slot-för-slot, så DEL kunde "ta" pass innan HEL hann.
+  // NEW: bygger lista över ALLA slots, sen för varje lager (HEL → DEL 50% →
+  // DEL 100% → TIM/EXT → öppna) väljer varje anställd sina bästa tillgängliga
+  // slots. Alla HEL fylls innan första DEL får ett pass.
+
+  const weeklyHoursTracker = {};
+  const weeklyShifts = [];
 
   // Bestäm startdatum för perioden (för frånvaro-kontroll)
   let periodStart = null;
@@ -14866,7 +14873,6 @@ function generateSchedulesForPeriod() {
     }
   } catch (e) { /* nope */ }
 
-  // Hjälpare: datum som ISO för givet veckoindex + dagindex
   function dateForDay(weekIdx, dayIdx) {
     if (!periodStart) return null;
     const d = new Date(periodStart);
@@ -14874,185 +14880,218 @@ function generateSchedulesForPeriod() {
     return d.toISOString().slice(0, 10);
   }
 
+  // ============ STEG 1: Init data-strukturer ============
   for (let weekIdx = 0; weekIdx < wizPeriodWeeks; weekIdx++) {
     weeklyHoursTracker[weekIdx] = {};
     employees.forEach(e => weeklyHoursTracker[weekIdx][e.initials] = 0);
+    weeklyShifts.push({0:[],1:[],2:[],3:[],4:[],5:[],6:[]});
+  }
 
-    const weekShifts = {0:[],1:[],2:[],3:[],4:[],5:[],6:[]};
-
-    // A/B-mönster — varannan vecka
+  // ============ STEG 2: Bygg flat lista av alla slots ============
+  // Varje slot = en tidsruta i mallen som behöver fyllas.
+  // assigned = initialer eller null
+  const allSlots = [];
+  for (let weekIdx = 0; weekIdx < wizPeriodWeeks; weekIdx++) {
     const pattern = (weekIdx % 2 === 0) ? 'A' : 'B';
     const template = schedule[pattern] || {};
-
     for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
       const templateSlots = template[dayIdx] || [];
-      const dayISO = dateForDay(weekIdx, dayIdx);
-
-      // För varje slot i mallen, försök tilldela enligt regler
-      templateSlots.forEach(templateSlot => {
-        const passHours = shiftDurationHours(templateSlot.s, templateSlot.e);
-        const suggestedInitials = templateSlot.i;
-        const suggestedEmp = suggestedInitials ? employees.find(e => e.initials === suggestedInitials) : null;
-
-        // Bestäm dept för slotten — föredra explicit dept-fält (auto-genererad mall),
-        // annars suggested employee, annars default servis
+      templateSlots.forEach((templateSlot, slotIdx) => {
+        const hours = shiftDurationHours(templateSlot.s, templateSlot.e);
+        const suggestedEmp = templateSlot.i ? employees.find(e => e.initials === templateSlot.i) : null;
         const slotDept = templateSlot.dept || (suggestedEmp ? suggestedEmp.dept : 'serv');
-
-        // Hjälpare: kolla om en kandidat passar för slotten
-        const isAvailable = (emp) => {
-          if (!emp) return false;
-          if (emp.dept !== slotDept) return false;
-          // Inte redan bokad idag
-          if (weekShifts[dayIdx].some(s => s.i === emp.initials)) return false;
-          // ANSTÄLLNINGSPERIOD — om personen inte är aktiv detta datum → ej tillgänglig
-          if (dayISO && !isEmployeeActiveOn(emp, dayISO)) return false;
-          // FRÅNVARO — om personen är borta denna dag → ej tillgänglig
-          if (dayISO && isEmployeeAbsentOn(emp, dayISO)) return false;
-          // 11h vila
-          if (!hasEnoughRestSince(emp, weekShifts, dayIdx, templateSlot.s)) return false;
-          // Max 13h pass (skipa om över)
-          if (passHours > 13) return false;
-          // Solo-pass: bara de som får jobba ensam (kollar samma block i denna dag)
-          // Vi anser slotten "solo" om det bara finns ETT pass i samma tidsfönster denna dag
-          // Förenklad regel: om mallen har bara ett pass denna dag i samma dept under överlappande tid
-          const overlapping = templateSlots.filter(s => {
-            if (s === templateSlot) return false;
-            const otherEmp = employees.find(e => e.initials === s.i);
-            if (!otherEmp || otherEmp.dept !== slotDept) return false;
-            // Kolla tidsöverlapp (förenklat)
-            return shiftsOverlap(templateSlot.s, templateSlot.e, s.s, s.e);
-          });
-          const isSolo = overlapping.length === 0;
-          if (isSolo) {
-            const canAlone = typeof emp.canWorkAlone === 'boolean'
-              ? emp.canWorkAlone
-              : (emp.type === 'HEL' || emp.type === 'DEL');
-            if (!canAlone) return false;
-          }
-          return true;
-        };
-
-        // === Strategi 1: HEL som inte fyllt 100% av kontrakt ===
-        // HEL PRIORITERAS ALLTID — heltid är heltid. Mall-suggestion respekteras
-        // bara om den är HEL eller alla HEL redan fyllda.
-        let candidates = employees.filter(e => e.type === 'HEL' && e.contract > 0);
-        candidates = candidates.filter(e => (weeklyHoursTracker[weekIdx][e.initials] || 0) < e.contract);
-        let pool = candidates.filter(isAvailable);
-
-        // Mall-favorit: om suggestedEmp är en HEL i poolen, ge dem prioritet
-        if (suggestedEmp && suggestedEmp.type === 'HEL' && pool.includes(suggestedEmp)) {
-          const newShift = { i: suggestedEmp.initials, s: templateSlot.s, e: templateSlot.e };
-          if (templateSlot.tag) newShift.tag = templateSlot.tag;
-          weekShifts[dayIdx].push(newShift);
-          weeklyHoursTracker[weekIdx][suggestedEmp.initials] = (weeklyHoursTracker[weekIdx][suggestedEmp.initials] || 0) + passHours;
-          return;
-        }
-
-        if (pool.length > 0) {
-          pool.sort((a,b) => {
-            const gapA = a.contract - (weeklyHoursTracker[weekIdx][a.initials] || 0);
-            const gapB = b.contract - (weeklyHoursTracker[weekIdx][b.initials] || 0);
-            const prefA = calcPreferenceScore(a, templateSlot, dayIdx, weekShifts, weekIdx, weeklyShifts);
-            const prefB = calcPreferenceScore(b, templateSlot, dayIdx, weekShifts, weekIdx, weeklyShifts);
-            // Soft-points: pref-skillnad väger mer än timgap-skillnad
-            return (gapB + prefB * 2) - (gapA + prefA * 2);
-          });
-          const picked = pool[0];
-          const newShift = { i: picked.initials, s: templateSlot.s, e: templateSlot.e };
-          if (templateSlot.tag) newShift.tag = templateSlot.tag;
-          weekShifts[dayIdx].push(newShift);
-          weeklyHoursTracker[weekIdx][picked.initials] = (weeklyHoursTracker[weekIdx][picked.initials] || 0) + passHours;
-          return;
-        }
-
-        // === Strategi 1b: Mall-suggestion när inga HEL behöver fyllas ===
-        // Om suggestedEmp är DEL/TIM/EXT och alla HEL redan fyllda → respektera mallen
-        if (suggestedEmp && suggestedEmp.type !== 'HEL' && isAvailable(suggestedEmp)) {
-          const newShift = { i: suggestedEmp.initials, s: templateSlot.s, e: templateSlot.e };
-          if (templateSlot.tag) newShift.tag = templateSlot.tag;
-          weekShifts[dayIdx].push(newShift);
-          weeklyHoursTracker[weekIdx][suggestedEmp.initials] = (weeklyHoursTracker[weekIdx][suggestedEmp.initials] || 0) + passHours;
-          return;
-        }
-
-        // === Strategi 3: DEL som inte fyllt 50% ===
-        candidates = employees.filter(e => e.type === 'DEL' && e.contract > 0);
-        candidates = candidates.filter(e => (weeklyHoursTracker[weekIdx][e.initials] || 0) < e.contract * 0.5);
-        pool = candidates.filter(isAvailable);
-        if (pool.length > 0) {
-          pool.sort((a,b) => {
-            const halfA = a.contract * 0.5;
-            const halfB = b.contract * 0.5;
-            const gapA = halfA - (weeklyHoursTracker[weekIdx][a.initials] || 0);
-            const gapB = halfB - (weeklyHoursTracker[weekIdx][b.initials] || 0);
-            const prefA = calcPreferenceScore(a, templateSlot, dayIdx, weekShifts, weekIdx, weeklyShifts);
-            const prefB = calcPreferenceScore(b, templateSlot, dayIdx, weekShifts, weekIdx, weeklyShifts);
-            return (gapB + prefB * 2) - (gapA + prefA * 2);
-          });
-          const picked = pool[0];
-          const newShift = { i: picked.initials, s: templateSlot.s, e: templateSlot.e };
-          if (templateSlot.tag) newShift.tag = templateSlot.tag;
-          weekShifts[dayIdx].push(newShift);
-          weeklyHoursTracker[weekIdx][picked.initials] = (weeklyHoursTracker[weekIdx][picked.initials] || 0) + passHours;
-          return;
-        }
-
-        // === Strategi 4: DEL mellan 50% och 100% — fyll upp till kontraktet innan öppet pass ===
-        candidates = employees.filter(e => e.type === 'DEL' && e.contract > 0);
-        candidates = candidates.filter(e => (weeklyHoursTracker[weekIdx][e.initials] || 0) < e.contract);
-        pool = candidates.filter(isAvailable);
-        if (pool.length > 0) {
-          pool.sort((a,b) => {
-            const gapA = a.contract - (weeklyHoursTracker[weekIdx][a.initials] || 0);
-            const gapB = b.contract - (weeklyHoursTracker[weekIdx][b.initials] || 0);
-            const prefA = calcPreferenceScore(a, templateSlot, dayIdx, weekShifts, weekIdx, weeklyShifts);
-            const prefB = calcPreferenceScore(b, templateSlot, dayIdx, weekShifts, weekIdx, weeklyShifts);
-            return (gapB + prefB * 2) - (gapA + prefA * 2);
-          });
-          const picked = pool[0];
-          const newShift = { i: picked.initials, s: templateSlot.s, e: templateSlot.e };
-          if (templateSlot.tag) newShift.tag = templateSlot.tag;
-          weekShifts[dayIdx].push(newShift);
-          weeklyHoursTracker[weekIdx][picked.initials] = (weeklyHoursTracker[weekIdx][picked.initials] || 0) + passHours;
-          return;
-        }
-
-        // === Strategi 5: TIM/EXT (timanställda + extra/vikarie) ===
-        candidates = employees.filter(e => e.type === 'TIM' || e.type === 'EXT');
-        pool = candidates.filter(isAvailable);
-        if (pool.length > 0) {
-          pool.sort((a,b) => {
-            // Prioritera lägst nuvarande timmar denna vecka (rättvisare fördelning)
-            const hoursA = weeklyHoursTracker[weekIdx][a.initials] || 0;
-            const hoursB = weeklyHoursTracker[weekIdx][b.initials] || 0;
-            const prefA = calcPreferenceScore(a, templateSlot, dayIdx, weekShifts, weekIdx, weeklyShifts);
-            const prefB = calcPreferenceScore(b, templateSlot, dayIdx, weekShifts, weekIdx, weeklyShifts);
-            // Mindre timmar + bättre pref = bättre kandidat
-            return (-hoursB + prefB * 2) - (-hoursA + prefA * 2);
-          });
-          const picked = pool[0];
-          const newShift = { i: picked.initials, s: templateSlot.s, e: templateSlot.e };
-          if (templateSlot.tag) newShift.tag = templateSlot.tag;
-          weekShifts[dayIdx].push(newShift);
-          weeklyHoursTracker[weekIdx][picked.initials] = (weeklyHoursTracker[weekIdx][picked.initials] || 0) + passHours;
-          return;
-        }
-
-        // === Strategi 6: ÖPPET PASS ===
-        const openShift = {
-          i: OPEN_SHIFT_MARKER,
-          s: templateSlot.s,
-          e: templateSlot.e,
+        // Beräkna alla andra slots samma dag och dept för solo-check
+        const sameDayDeptSlots = templateSlots
+          .filter((s, idx) => idx !== slotIdx && (s.dept || (s.i && (employees.find(e => e.initials === s.i) || {}).dept) || 'serv') === slotDept);
+        allSlots.push({
+          weekIdx, dayIdx, templateSlot, hours,
           dept: slotDept,
-          block: 'mall', // tagg för att markera att den kommer från mallen
-          openTitle: templateSlot.tag || null,
-          suggestedInitials: suggestedInitials // info om vem mallen föreslog (för debug)
-        };
-        weekShifts[dayIdx].push(openShift);
+          suggested: templateSlot.i,
+          sameDayDeptSlots,
+          assigned: null,
+        });
       });
     }
+  }
 
-    weeklyShifts.push(weekShifts);
+  // ============ STEG 3: Helpers ============
+  function canAssign(slot, emp) {
+    if (!emp) return false;
+    if (slot.assigned) return false;
+    if (emp.dept !== slot.dept) return false;
+    // Max 13h pass
+    if (slot.hours > 13) return false;
+    const weekShifts = weeklyShifts[slot.weekIdx];
+    // Inte redan bokad samma dag
+    if (weekShifts[slot.dayIdx].some(s => s.i === emp.initials)) return false;
+    // Anställningsperiod + frånvaro
+    const dayISO = dateForDay(slot.weekIdx, slot.dayIdx);
+    if (dayISO && typeof isEmployeeActiveOn === 'function' && !isEmployeeActiveOn(emp, dayISO)) return false;
+    if (dayISO && typeof isEmployeeAbsentOn === 'function' && isEmployeeAbsentOn(emp, dayISO)) return false;
+    // 11h vila
+    if (!hasEnoughRestSince(emp, weekShifts, slot.dayIdx, slot.templateSlot.s)) return false;
+    // Solo-pass: är detta enda passet i dept idag under överlappande tid?
+    const overlapping = slot.sameDayDeptSlots.filter(s =>
+      shiftsOverlap(slot.templateSlot.s, slot.templateSlot.e, s.s, s.e)
+    );
+    const isSolo = overlapping.length === 0;
+    if (isSolo) {
+      const canAlone = typeof emp.canWorkAlone === 'boolean'
+        ? emp.canWorkAlone
+        : (emp.type === 'HEL' || emp.type === 'DEL');
+      if (!canAlone) return false;
+    }
+    return true;
+  }
+
+  function assign(slot, emp) {
+    const newShift = { i: emp.initials, s: slot.templateSlot.s, e: slot.templateSlot.e };
+    if (slot.templateSlot.tag) newShift.tag = slot.templateSlot.tag;
+    weeklyShifts[slot.weekIdx][slot.dayIdx].push(newShift);
+    weeklyHoursTracker[slot.weekIdx][emp.initials] += slot.hours;
+    slot.assigned = emp.initials;
+  }
+
+  function rankSlotsForEmp(emp, slots) {
+    return [...slots].sort((a, b) => {
+      // Mall-suggestion → stark bonus
+      const suggA = a.suggested === emp.initials ? 1 : 0;
+      const suggB = b.suggested === emp.initials ? 1 : 0;
+      if (suggA !== suggB) return suggB - suggA;
+      // Pref-score (preferenser, undvika dagar, OB-balansering)
+      const prefA = calcPreferenceScore(emp, a.templateSlot, a.dayIdx, weeklyShifts[a.weekIdx], a.weekIdx, weeklyShifts);
+      const prefB = calcPreferenceScore(emp, b.templateSlot, b.dayIdx, weeklyShifts[b.weekIdx], b.weekIdx, weeklyShifts);
+      return prefB - prefA;
+    });
+  }
+
+  // Försök fylla en emp upp till targetHours i en given vecka.
+  // Returnerar antal pass som tilldelades.
+  function fillEmployeeToTarget(emp, weekIdx, targetHours) {
+    let assigned = 0;
+    let safety = 50; // skydd mot infinite loops
+    while ((weeklyHoursTracker[weekIdx][emp.initials] || 0) < targetHours && safety-- > 0) {
+      const available = allSlots.filter(s =>
+        s.weekIdx === weekIdx &&
+        s.assigned === null &&
+        canAssign(s, emp)
+      );
+      if (available.length === 0) break;
+      const ranked = rankSlotsForEmp(emp, available);
+      assign(ranked[0], emp);
+      assigned++;
+    }
+    return assigned;
+  }
+
+  // ============ STEG 4: FAS 1 — HEL till 100% av kontrakt ============
+  // Iterera tills inget mer kan tilldelas (round-robin för rättvisa)
+  let progress = true;
+  while (progress) {
+    progress = false;
+    const heltidare = employees.filter(e => e.type === 'HEL' && e.contract > 0);
+    for (const emp of heltidare) {
+      for (let weekIdx = 0; weekIdx < wizPeriodWeeks; weekIdx++) {
+        // Tilldela ett pass i taget per emp för rättvis fördelning över personer
+        const currentHours = weeklyHoursTracker[weekIdx][emp.initials] || 0;
+        if (currentHours >= emp.contract) continue;
+        const available = allSlots.filter(s =>
+          s.weekIdx === weekIdx && s.assigned === null && canAssign(s, emp)
+        );
+        if (available.length === 0) continue;
+        const ranked = rankSlotsForEmp(emp, available);
+        assign(ranked[0], emp);
+        progress = true;
+      }
+    }
+  }
+
+  // ============ STEG 5: FAS 2 — DEL till 50% av kontrakt (round-robin) ============
+  progress = true;
+  while (progress) {
+    progress = false;
+    const deltidare = employees.filter(e => e.type === 'DEL' && e.contract > 0);
+    for (const emp of deltidare) {
+      for (let weekIdx = 0; weekIdx < wizPeriodWeeks; weekIdx++) {
+        const target = emp.contract * 0.5;
+        const currentHours = weeklyHoursTracker[weekIdx][emp.initials] || 0;
+        if (currentHours >= target) continue;
+        const available = allSlots.filter(s =>
+          s.weekIdx === weekIdx && s.assigned === null && canAssign(s, emp)
+        );
+        if (available.length === 0) continue;
+        const ranked = rankSlotsForEmp(emp, available);
+        assign(ranked[0], emp);
+        progress = true;
+      }
+    }
+  }
+
+  // ============ STEG 6: FAS 3 — DEL från 50% till 100% av kontrakt ============
+  progress = true;
+  while (progress) {
+    progress = false;
+    const deltidare = employees.filter(e => e.type === 'DEL' && e.contract > 0);
+    for (const emp of deltidare) {
+      for (let weekIdx = 0; weekIdx < wizPeriodWeeks; weekIdx++) {
+        const currentHours = weeklyHoursTracker[weekIdx][emp.initials] || 0;
+        if (currentHours >= emp.contract) continue;
+        const available = allSlots.filter(s =>
+          s.weekIdx === weekIdx && s.assigned === null && canAssign(s, emp)
+        );
+        if (available.length === 0) continue;
+        const ranked = rankSlotsForEmp(emp, available);
+        assign(ranked[0], emp);
+        progress = true;
+      }
+    }
+  }
+
+  // ============ STEG 7: FAS 4 — TIM/EXT (rättvis: lägst-timmar först) ============
+  progress = true;
+  while (progress) {
+    progress = false;
+    const flexibla = employees.filter(e => e.type === 'TIM' || e.type === 'EXT');
+    if (flexibla.length === 0) break;
+    // Hämta alla återstående öppna slots
+    const openSlots = allSlots.filter(s => s.assigned === null);
+    if (openSlots.length === 0) break;
+    // För varje öppen slot, försök fylla med TIM/EXT som har lägst timmar denna vecka
+    for (const slot of openSlots) {
+      const candidates = flexibla.filter(emp => canAssign(slot, emp));
+      if (candidates.length === 0) continue;
+      candidates.sort((a, b) => {
+        const hoursA = weeklyHoursTracker[slot.weekIdx][a.initials] || 0;
+        const hoursB = weeklyHoursTracker[slot.weekIdx][b.initials] || 0;
+        if (hoursA !== hoursB) return hoursA - hoursB; // mindre timmar prioriteras
+        const prefA = calcPreferenceScore(a, slot.templateSlot, slot.dayIdx, weeklyShifts[slot.weekIdx], slot.weekIdx, weeklyShifts);
+        const prefB = calcPreferenceScore(b, slot.templateSlot, slot.dayIdx, weeklyShifts[slot.weekIdx], slot.weekIdx, weeklyShifts);
+        return prefB - prefA;
+      });
+      assign(slot, candidates[0]);
+      progress = true;
+    }
+  }
+
+  // ============ STEG 8: FAS 5 — Resterande slots = ÖPPNA PASS ============
+  for (const slot of allSlots) {
+    if (slot.assigned !== null) continue;
+    weeklyShifts[slot.weekIdx][slot.dayIdx].push({
+      i: OPEN_SHIFT_MARKER,
+      s: slot.templateSlot.s,
+      e: slot.templateSlot.e,
+      dept: slot.dept,
+      block: 'mall',
+      openTitle: slot.templateSlot.tag || null,
+      suggestedInitials: slot.suggested,
+    });
+  }
+
+  // ============ STEG 9: Sortera pass per dag på starttid (för konsistent UI) ============
+  for (let weekIdx = 0; weekIdx < wizPeriodWeeks; weekIdx++) {
+    for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
+      weeklyShifts[weekIdx][dayIdx].sort((a, b) => (a.s || '').localeCompare(b.s || ''));
+    }
   }
 
   return { weeklyShifts, weeklyHoursTracker };
