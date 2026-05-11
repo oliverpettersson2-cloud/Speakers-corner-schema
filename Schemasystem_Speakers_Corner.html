@@ -9318,6 +9318,84 @@ function shiftPaidHours(s) {
   return dur - breakMin/60;
 }
 
+// =============================================================
+// SVENSKA HELGDAGAR + STORHELG (Visita-avtalet)
+// =============================================================
+// Storhelg = 100% extra timlön ovanpå vanlig OB. Lista av svenska helgdagar
+// inklusive variabla (påsk-baserade, midsommar, alla helgons dag).
+
+function easterDate(year) {
+  // Gauss påsk-algoritm (Anonymous Gregorian)
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const L = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * L) / 451);
+  const month = Math.floor((h + L - 7 * m + 114) / 31);
+  const day = ((h + L - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+function _addDays(d, n) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+function _iso(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+function swedishHolidays(year) {
+  const easter = easterDate(year);
+  // Midsommarafton: fredag mellan 19-25 juni
+  let midsommarafton = new Date(year, 5, 19);
+  while (midsommarafton.getDay() !== 5) midsommarafton = _addDays(midsommarafton, 1);
+  const midsommardagen = _addDays(midsommarafton, 1);
+  // Alla helgons dag: lördag mellan 31 okt - 6 nov
+  let allaHelgon = new Date(year, 9, 31);
+  while (allaHelgon.getDay() !== 6) allaHelgon = _addDays(allaHelgon, 1);
+  return [
+    { date: new Date(year, 0, 1), name: 'Nyårsdagen' },
+    { date: new Date(year, 0, 5), name: 'Trettondagsafton' },
+    { date: new Date(year, 0, 6), name: 'Trettondedag jul' },
+    { date: _addDays(easter, -3), name: 'Skärtorsdag' },
+    { date: _addDays(easter, -2), name: 'Långfredag' },
+    { date: _addDays(easter, -1), name: 'Påskafton' },
+    { date: easter, name: 'Påskdagen' },
+    { date: _addDays(easter, 1), name: 'Annandag påsk' },
+    { date: new Date(year, 3, 30), name: 'Valborgsmässoafton' },
+    { date: new Date(year, 4, 1), name: 'Första maj' },
+    { date: _addDays(easter, 39), name: 'Kristi himmelsfärds dag' },
+    { date: new Date(year, 5, 5), name: 'Pingstafton' },
+    { date: _addDays(easter, 49), name: 'Pingstdagen' },
+    { date: new Date(year, 5, 6), name: 'Sveriges nationaldag' },
+    { date: midsommarafton, name: 'Midsommarafton' },
+    { date: midsommardagen, name: 'Midsommardagen' },
+    { date: allaHelgon, name: 'Alla helgons dag' },
+    { date: new Date(year, 11, 24), name: 'Julafton' },
+    { date: new Date(year, 11, 25), name: 'Juldagen' },
+    { date: new Date(year, 11, 26), name: 'Annandag jul' },
+    { date: new Date(year, 11, 31), name: 'Nyårsafton' },
+  ];
+}
+
+// Snabb-check om ett ISO-datum är svensk storhelg
+function isStorhelg(dateISO) {
+  if (!dateISO) return false;
+  const y = parseInt(dateISO.slice(0, 4), 10);
+  if (!y) return false;
+  const list = swedishHolidays(y);
+  return list.some(h => _iso(h.date) === dateISO);
+}
+
 // OB calc — simplified Visita rules:
 //  - Mån-fre 18-23: +50% on hourly rate
 //  - Mån-fre 23-06: +70%
@@ -14655,6 +14733,18 @@ function shiftDurationHours(start, end) {
   return (e - s) / 60;
 }
 
+// Faktisk ARBETSTID (drar av obetald rast enligt arbetstidslagen)
+// Pass ≤ 5h: ingen rast krävs → schemalagd tid = arbetstid
+// Pass 5–8h: 15 min obetald rast → arbetstid = schemalagd - 0,25h
+// Pass > 8h: 30 min obetald rast → arbetstid = schemalagd - 0,5h
+// Detta används för kontrakt-fyllnad och lönekostnad-beräkning.
+function workingHours(start, end) {
+  const sched = shiftDurationHours(start, end);
+  if (sched <= 5) return sched;
+  if (sched <= 8) return Math.max(0, sched - 0.25);
+  return Math.max(0, sched - 0.5);
+}
+
 // Hjälpare: slumpvis välj från en grupp (för rättvist initialt val)
 function _shuffle(arr) {
   const a = [...arr];
@@ -14699,8 +14789,10 @@ function buildShiftSlotsForDay(dayKey) {
   return slots;
 }
 
-// Kontrollera vila — har personen fått 11h vila sedan föregående pass?
-function hasEnoughRestSince(emp, weekShifts, dayIdx, newStart) {
+// Kontrollera vila — har personen fått minst minRestHours vila sedan föregående pass?
+// minRestHours default 11h (arbetstidslagen). Vid emp.exception=true tillåts 8h
+// (Visita-avtalet: tillfällig avvikelse vid stäng-→-öppna, kompenseras senare).
+function hasEnoughRestSince(emp, weekShifts, dayIdx, newStart, minRestHours = 11) {
   // Kolla föregående dag (om det finns)
   if (dayIdx === 0) return true; // början av vecka — antag OK
   const prevDay = weekShifts[dayIdx - 1] || [];
@@ -14721,7 +14813,7 @@ function hasEnoughRestSince(emp, weekShifts, dayIdx, newStart) {
     prevEndMin += 24 * 60;
   }
   const restHours = (newStartMin - prevEndMin) / 60;
-  return restHours >= 11;
+  return restHours >= minRestHours;
 }
 
 // Bestäm vilken avdelning ett pass tillhör baserat på föreslagen person eller block
@@ -14935,13 +15027,14 @@ function generateSchedulesForPeriod() {
       });
       templateSlots.forEach((templateSlot, slotIdx) => {
         const hours = shiftDurationHours(templateSlot.s, templateSlot.e);
+        const workHours = workingHours(templateSlot.s, templateSlot.e);
         const suggestedEmp = templateSlot.i ? employees.find(e => e.initials === templateSlot.i) : null;
         const slotDept = templateSlot.dept || (suggestedEmp ? suggestedEmp.dept : 'serv');
         // Beräkna alla andra slots samma dag och dept för solo-check
         const sameDayDeptSlots = templateSlots
           .filter((s, idx) => idx !== slotIdx && (s.dept || (s.i && (employees.find(e => e.initials === s.i) || {}).dept) || 'serv') === slotDept);
         allSlots.push({
-          weekIdx, dayIdx, templateSlot, hours,
+          weekIdx, dayIdx, templateSlot, hours, workHours,
           dept: slotDept,
           suggested: templateSlot.i,
           sameDayDeptSlots,
@@ -14966,8 +15059,9 @@ function generateSchedulesForPeriod() {
     const dayISO = dateForDay(slot.weekIdx, slot.dayIdx);
     if (dayISO && typeof isEmployeeActiveOn === 'function' && !isEmployeeActiveOn(emp, dayISO)) return false;
     if (dayISO && typeof isEmployeeAbsentOn === 'function' && isEmployeeAbsentOn(emp, dayISO)) return false;
-    // 11h dygnsvila
-    if (!hasEnoughRestSince(emp, weekShifts, slot.dayIdx, slot.templateSlot.s)) return false;
+    // Dygnsvila: 11h standard, 8h tillåts vid emp.exception=true (Visita-dispens)
+    const minRest = emp.exception === true ? 8 : 11;
+    if (!hasEnoughRestSince(emp, weekShifts, slot.dayIdx, slot.templateSlot.s, minRest)) return false;
     // 36h veckovila — krävs ETT sammanhängande 36h-fönster måndag–söndag
     // Lägger inte till passet om det skulle ta bort sista möjligheten till 36h vila
     if (!has36hWeeklyRest(emp, slot, weekShifts)) return false;
@@ -14989,7 +15083,8 @@ function generateSchedulesForPeriod() {
     const newShift = { i: emp.initials, s: slot.templateSlot.s, e: slot.templateSlot.e };
     if (slot.templateSlot.tag) newShift.tag = slot.templateSlot.tag;
     weeklyShifts[slot.weekIdx][slot.dayIdx].push(newShift);
-    weeklyHoursTracker[slot.weekIdx][emp.initials] += slot.hours;
+    // Räkna ARBETSTID (workHours, med avdrag för obetald rast) mot kontrakt
+    weeklyHoursTracker[slot.weekIdx][emp.initials] += slot.workHours;
     slot.assigned = emp.initials;
   }
 
