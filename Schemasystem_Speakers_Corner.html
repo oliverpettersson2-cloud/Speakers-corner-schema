@@ -14887,6 +14887,37 @@ function generateSchedulesForPeriod() {
     weeklyShifts.push({0:[],1:[],2:[],3:[],4:[],5:[],6:[]});
   }
 
+  // ============ HJÄLPARE: Splitta pass > 13h enligt arbetstidslagen ============
+  // I mallen finns ibland pass som spänner hela dagen (t.ex. lör 10-01:45 = 15.75h).
+  // Splitar vi i två pass vid 16:00 (dag→kväll-övergång) eller mittpunkten,
+  // så att två olika anställda tar dag- resp kvällspasset.
+  function splitLongShift(slot) {
+    const h = shiftDurationHours(slot.s, slot.e);
+    if (h <= 13) return [slot];
+    const [sh, sm] = slot.s.split(':').map(Number);
+    const [eh, em] = slot.e.split(':').map(Number);
+    let startMin = sh * 60 + sm;
+    let endMin = eh * 60 + em;
+    if (endMin <= startMin) endMin += 24 * 60;
+    // Försök 16:00 (vanliga dag→kväll-övergången), annars mittpunkten
+    let splitMin = 16 * 60;
+    if (splitMin <= startMin || splitMin >= endMin) {
+      splitMin = Math.round((startMin + endMin) / 2);
+    }
+    const splitH = Math.floor((splitMin % (24 * 60)) / 60);
+    const splitM = splitMin % 60;
+    const splitStr = `${String(splitH).padStart(2,'0')}:${String(splitM).padStart(2,'0')}`;
+    // Pass 1: behåller suggested + tag (det är "originalpasset")
+    const slot1 = { ...slot, e: splitStr };
+    // Pass 2: tas över av annan person (suggested rensas, tag bevaras inte)
+    const slot2 = { ...slot, s: splitStr, i: null };
+    delete slot2.tag;
+    return [slot1, slot2];
+  }
+
+  // Räknare för diagnostik (visas i toast efter generering)
+  let _splitCount = 0;
+
   // ============ STEG 2: Bygg flat lista av alla slots ============
   // Varje slot = en tidsruta i mallen som behöver fyllas.
   // assigned = initialer eller null
@@ -14895,7 +14926,13 @@ function generateSchedulesForPeriod() {
     const pattern = (weekIdx % 2 === 0) ? 'A' : 'B';
     const template = schedule[pattern] || {};
     for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
-      const templateSlots = template[dayIdx] || [];
+      const rawSlots = template[dayIdx] || [];
+      // Splita alla pass > 13h innan vidare bearbetning
+      const templateSlots = rawSlots.flatMap(s => {
+        const splits = splitLongShift(s);
+        if (splits.length > 1) _splitCount++;
+        return splits;
+      });
       templateSlots.forEach((templateSlot, slotIdx) => {
         const hours = shiftDurationHours(templateSlot.s, templateSlot.e);
         const suggestedEmp = templateSlot.i ? employees.find(e => e.initials === templateSlot.i) : null;
@@ -14919,14 +14956,9 @@ function generateSchedulesForPeriod() {
     if (!emp) return false;
     if (slot.assigned) return false;
     if (emp.dept !== slot.dept) return false;
-    // Max 13h pass — TILLÅTS vid dispens (exception:true) eller om mallen
-    // specifikt föreslår denna person (Oliver har medvetet lagt 13h+ pass
-    // i mallen, t.ex. lör-stäng). Annars hård gräns 13h.
-    if (slot.hours > 13) {
-      const hasDispensation = emp.exception === true;
-      const isSuggestedHere = slot.suggested === emp.initials;
-      if (!hasDispensation && !isSuggestedHere) return false;
-    }
+    // Max 13h pass — hård gräns. Alla mall-pass > 13h splittas redan tidigare,
+    // så denna check skyddar mot edge cases (t.ex. manuellt redigerade pass).
+    if (slot.hours > 13) return false;
     const weekShifts = weeklyShifts[slot.weekIdx];
     // Inte redan bokad samma dag
     if (weekShifts[slot.dayIdx].some(s => s.i === emp.initials)) return false;
@@ -15100,7 +15132,7 @@ function generateSchedulesForPeriod() {
     }
   }
 
-  return { weeklyShifts, weeklyHoursTracker };
+  return { weeklyShifts, weeklyHoursTracker, splitCount: _splitCount };
 }
 
 // Hjälpare: kolla om två pass överlappar (hanterar pass över midnatt)
@@ -15286,11 +15318,14 @@ async function bbGenerateSchedule() {
     const openTxt = openShifts > 0
       ? `${openShifts} öppna pass att fylla (streckad orange ram)`
       : 'Alla pass tilldelade — inga öppna kvar';
+    const splitTxt = (result && result.splitCount > 0)
+      ? ` · ${result.splitCount} långa pass (>13h) delades automatiskt enligt arbetstidslagen`
+      : '';
     showToast({
       title: `✓ Schema klart — ${filled} av ${totalShifts} pass tilldelade`,
-      detail: `${weeks} veckor från ${dateToISO(start)} · ${openTxt} · Automatsparat`,
+      detail: `${weeks} veckor från ${dateToISO(start)} · ${openTxt} · Automatsparat${splitTxt}`,
       type: openShifts > 0 ? 'warn' : 'success',
-      duration: 7000,
+      duration: 7500,
     });
   }, 200);
 }
