@@ -15571,6 +15571,88 @@ function generateSchedulesForPeriod() {
     }
   }
 
+  // ============ STEG 4b: REBALANSERING — flytta pass från över- till underbelastad ============
+  // Greedy round-robin kan fastna när en HEL är regelblockerad på vissa pass och
+  // en annan tar dem istället. Resultat: 30+ procentenheters skillnad mellan
+  // HEL i samma typ. Här försöker vi "byta" pass: om VR är under sin contract
+  // och SS är över, försök ta ett av SS:s pass och ge till VR (om VR kan ta det).
+  function rebalanceByType(empType, targetHours) {
+    let progress = true;
+    let safety = 300;
+    while (progress && safety-- > 0) {
+      progress = false;
+      for (let weekIdx = 0; weekIdx < wizPeriodWeeks; weekIdx++) {
+        const emps = employees.filter(e => e.type === empType && e.contract > 0);
+        // Beräkna fyllnadsgrad per emp denna vecka
+        const stats = emps.map(emp => {
+          const hours = weeklyHoursTracker[weekIdx][emp.initials] || 0;
+          const target = targetHours(emp);
+          return { emp, hours, gap: target - hours, target };
+        });
+        // Hitta största över och under
+        const under = stats.filter(s => s.gap > 4).sort((a,b) => b.gap - a.gap);
+        const over = stats.filter(s => s.gap < -4 || s.hours > s.target).sort((a,b) => a.gap - b.gap);
+        if (under.length === 0 || over.length === 0) continue;
+
+        // För varje par (under, over) i samma dept, försök byta
+        for (const u of under) {
+          for (const o of over) {
+            if (u.emp.dept !== o.emp.dept) continue;
+            if (u.emp.initials === o.emp.initials) continue;
+
+            // Hitta ett av o:s pass som u kan ta
+            let swapped = false;
+            const oDays = [];
+            for (let d = 0; d < 7; d++) {
+              (weeklyShifts[weekIdx][d] || []).forEach((s, idx) => {
+                if (s.i === o.emp.initials) oDays.push({ d, idx, shift: s });
+              });
+            }
+            for (const o2 of oDays) {
+              const sched = shiftDurationHours(o2.shift.s, o2.shift.e);
+              const work = workingHours(o2.shift.s, o2.shift.e);
+              // Tillfälligt ta bort o:s pass
+              weeklyShifts[weekIdx][o2.d].splice(o2.idx, 1);
+              weeklyHoursTracker[weekIdx][o.emp.initials] -= work;
+
+              // Bygg en temporär slot för canAssign
+              const tempSlot = {
+                weekIdx, dayIdx: o2.d,
+                templateSlot: { s: o2.shift.s, e: o2.shift.e, tag: o2.shift.tag },
+                hours: sched,
+                workHours: work,
+                dept: u.emp.dept,
+                suggested: null,
+                sameDayDeptSlots: (weeklyShifts[weekIdx][o2.d] || []).map(s => ({ s: s.s, e: s.e })),
+                assigned: null,
+              };
+
+              if (canAssign(tempSlot, u.emp)) {
+                // u kan ta det — tilldela
+                weeklyShifts[weekIdx][o2.d].push({ i: u.emp.initials, s: o2.shift.s, e: o2.shift.e, ...(o2.shift.tag ? {tag: o2.shift.tag} : {}) });
+                weeklyHoursTracker[weekIdx][u.emp.initials] += work;
+                swapped = true;
+                progress = true;
+                break;
+              } else {
+                // Återställ o:s pass
+                weeklyShifts[weekIdx][o2.d].splice(o2.idx, 0, o2.shift);
+                weeklyHoursTracker[weekIdx][o.emp.initials] += work;
+              }
+            }
+            if (swapped) break;
+          }
+          if (progress) break;
+        }
+      }
+    }
+  }
+
+  // Kör rebalansering för HEL (mål = contract)
+  rebalanceByType('HEL', (emp) => emp.contract);
+  // Också för DEL (mål = contract, så inte över egna contract)
+  rebalanceByType('DEL', (emp) => emp.contract);
+
   // ============ STEG 5: FAS 2 — DEL till 50% av kontrakt (round-robin) ============
   // Samma sort-logik som FAS 1: minst-fylld DEL går först per iteration
   progress = true;
