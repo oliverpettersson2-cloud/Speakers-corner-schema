@@ -14966,8 +14966,11 @@ function generateSchedulesForPeriod() {
     const dayISO = dateForDay(slot.weekIdx, slot.dayIdx);
     if (dayISO && typeof isEmployeeActiveOn === 'function' && !isEmployeeActiveOn(emp, dayISO)) return false;
     if (dayISO && typeof isEmployeeAbsentOn === 'function' && isEmployeeAbsentOn(emp, dayISO)) return false;
-    // 11h vila
+    // 11h dygnsvila
     if (!hasEnoughRestSince(emp, weekShifts, slot.dayIdx, slot.templateSlot.s)) return false;
+    // 36h veckovila — krävs ETT sammanhängande 36h-fönster måndag–söndag
+    // Lägger inte till passet om det skulle ta bort sista möjligheten till 36h vila
+    if (!has36hWeeklyRest(emp, slot, weekShifts)) return false;
     // Solo-pass: är detta enda passet i dept idag under överlappande tid?
     const overlapping = slot.sameDayDeptSlots.filter(s =>
       shiftsOverlap(slot.templateSlot.s, slot.templateSlot.e, s.s, s.e)
@@ -14988,6 +14991,55 @@ function generateSchedulesForPeriod() {
     weeklyShifts[slot.weekIdx][slot.dayIdx].push(newShift);
     weeklyHoursTracker[slot.weekIdx][emp.initials] += slot.hours;
     slot.assigned = emp.initials;
+  }
+
+  // 36h veckovila-check: simulerar vad som händer OM emp tar detta pass.
+  // Bygger en flat lista av alla 7×24h = 168h i veckan, markerar arbets-timmar
+  // och letar längsta sammanhängande "ledig"-fönster. Om < 36h → returnera false.
+  function has36hWeeklyRest(emp, slot, weekShifts) {
+    // Bygg array av minuter i veckan (10080 min totalt = 7 × 24 × 60)
+    // Markerar varje arbetsminut. Sen letar längsta noll-streck.
+    const WEEK_MIN = 10080;
+    const busy = new Uint8Array(WEEK_MIN);
+
+    function markRange(dayIdx, sStr, eStr) {
+      const [sh, sm] = sStr.split(':').map(Number);
+      const [eh, em] = eStr.split(':').map(Number);
+      let startMin = dayIdx * 1440 + sh * 60 + sm;
+      let endMin = dayIdx * 1440 + eh * 60 + em;
+      if (endMin <= startMin) endMin += 1440; // pass över midnatt
+      for (let m = startMin; m < endMin && m < WEEK_MIN; m++) busy[m] = 1;
+      // Om passet sträcker sig in i nästa vecka (söndag-natt-pass), wrappa
+      if (endMin > WEEK_MIN) {
+        for (let m = 0; m < endMin - WEEK_MIN; m++) busy[m] = 1;
+      }
+    }
+
+    // 1. Markera alla redan tilldelade pass denna vecka för emp
+    for (let d = 0; d < 7; d++) {
+      const shifts = weekShifts[d] || [];
+      shifts.forEach(s => {
+        if (s.i === emp.initials) markRange(d, s.s, s.e);
+      });
+    }
+    // 2. Markera det FÖRESLAGNA passet
+    markRange(slot.dayIdx, slot.templateSlot.s, slot.templateSlot.e);
+
+    // 3. Hitta längsta sammanhängande 0-streck (cirkulärt över veckan)
+    let maxRun = 0;
+    let currentRun = 0;
+    // Kör 2× veckan för att fånga cyklisk vila (söndag-kväll → måndag-morgon)
+    for (let i = 0; i < WEEK_MIN * 2; i++) {
+      if (busy[i % WEEK_MIN]) {
+        if (currentRun > maxRun) maxRun = currentRun;
+        currentRun = 0;
+      } else {
+        currentRun++;
+      }
+    }
+    if (currentRun > maxRun) maxRun = currentRun;
+
+    return maxRun >= 36 * 60; // 36 timmar i minuter
   }
 
   function rankSlotsForEmp(emp, slots) {
@@ -15074,6 +15126,29 @@ function generateSchedulesForPeriod() {
       for (let weekIdx = 0; weekIdx < wizPeriodWeeks; weekIdx++) {
         const currentHours = weeklyHoursTracker[weekIdx][emp.initials] || 0;
         if (currentHours >= emp.contract) continue;
+        const available = allSlots.filter(s =>
+          s.weekIdx === weekIdx && s.assigned === null && canAssign(s, emp)
+        );
+        if (available.length === 0) continue;
+        const ranked = rankSlotsForEmp(emp, available);
+        assign(ranked[0], emp);
+        progress = true;
+      }
+    }
+  }
+
+  // ============ STEG 6b: FAS 3b — DEL från kontrakt till 40h (vikariat) ============
+  // Visita-avtalet 2025-: deltidsanställd kan jobba upp till 40h/v som
+  // "vikariat eller tillfälligt utökat behov" utan att räknas som mertid.
+  // Algoritmen utnyttjar denna kapacitet INNAN den faller till TIM/EXT eller öppet pass.
+  progress = true;
+  while (progress) {
+    progress = false;
+    const deltidare = employees.filter(e => e.type === 'DEL' && e.contract > 0);
+    for (const emp of deltidare) {
+      for (let weekIdx = 0; weekIdx < wizPeriodWeeks; weekIdx++) {
+        const currentHours = weeklyHoursTracker[weekIdx][emp.initials] || 0;
+        if (currentHours >= 40) continue; // hård cap vid 40h (övertid om över)
         const available = allSlots.filter(s =>
           s.weekIdx === weekIdx && s.assigned === null && canAssign(s, emp)
         );
