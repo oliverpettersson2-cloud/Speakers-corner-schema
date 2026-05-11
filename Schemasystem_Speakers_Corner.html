@@ -15197,16 +15197,16 @@ async function bbGenerateSchedule() {
   }
 
   setTimeout(() => {
-    alert(
-      `✓ Schema genererat och sparat\n\n` +
-      `Period: ${weeks} veckor från ${dateToISO(start)}\n` +
-      `Totalt: ${totalShifts} pass\n` +
-      `Tilldelade: ${totalShifts - openShifts}\n` +
-      `Öppna pass att fylla: ${openShifts}\n\n` +
-      `Öppna pass markeras med streckad orange ram i schemat.\n` +
-      `Lista över öppna pass visas också under schemat.\n\n` +
-      `(Schemat är automatsparat — du hittar det i Exportera-fliken.)`
-    );
+    const filled = totalShifts - openShifts;
+    const openTxt = openShifts > 0
+      ? `${openShifts} öppna pass att fylla (streckad orange ram)`
+      : 'Alla pass tilldelade — inga öppna kvar';
+    showToast({
+      title: `✓ Schema klart — ${filled} av ${totalShifts} pass tilldelade`,
+      detail: `${weeks} veckor från ${dateToISO(start)} · ${openTxt} · Automatsparat`,
+      type: openShifts > 0 ? 'warn' : 'success',
+      duration: 7000,
+    });
   }, 200);
 }
 
@@ -15356,9 +15356,45 @@ RESTAURANT_DATA.speakers = {
   periodWeeks: [], // periodWeeks är specifikt för aktuell körning, börja tom
 };
 
-// Fellini och Tycho startar tomma
-RESTAURANT_DATA.fellini = createEmptyRestaurantData();
-RESTAURANT_DATA.tycho = createEmptyRestaurantData();
+// Fellini och Tycho seedas med demo-data så pitch funkar för alla tre
+RESTAURANT_DATA.tycho = seedDemoRestaurant('tycho');
+RESTAURANT_DATA.fellini = seedDemoRestaurant('fellini');
+
+function seedDemoRestaurant(key) {
+  // Bygg en variant av Speakers-defaults med restaurang-specifik crew
+  const CREWS = {
+    tycho: [
+      // Servis
+      { initials:'AB', dept:'serv', avg:42.0, contract:40, type:'HEL', wageType:'month', wage:34500, exception:true,  canWorkAlone:true,  absences:[] },
+      { initials:'CL', dept:'serv', avg:28.0, contract:30, type:'DEL', wageType:'hour',  wage:188, exception:false, canWorkAlone:true,  absences:[] },
+      { initials:'MO', dept:'serv', avg:22.0, contract:25, type:'DEL', wageType:'hour',  wage:182, exception:false, canWorkAlone:true,  absences:[] },
+      { initials:'DA', dept:'serv', avg:6.0,  contract:0,  type:'TIM', wageType:'hour',  wage:172, exception:false, canWorkAlone:false, absences:[] },
+      // Kök
+      { initials:'HK', dept:'kok',  avg:40.0, contract:40, type:'HEL', wageType:'month', wage:37500, exception:false, canWorkAlone:true,  absences:[] },
+      { initials:'MA', dept:'kok',  avg:30.0, contract:30, type:'DEL', wageType:'hour',  wage:210, exception:false, canWorkAlone:true,  absences:[] },
+      { initials:'LF', dept:'kok',  avg:10.0, contract:0,  type:'TIM', wageType:'hour',  wage:188, exception:false, canWorkAlone:false, absences:[] },
+    ],
+    fellini: [
+      // Servis (Italian-inspired blandning)
+      { initials:'MR', dept:'serv', avg:44.0, contract:40, type:'HEL', wageType:'month', wage:36000, exception:true,  canWorkAlone:true,  absences:[] },
+      { initials:'GJ', dept:'serv', avg:30.0, contract:30, type:'DEL', wageType:'hour',  wage:192, exception:false, canWorkAlone:true,  absences:[] },
+      { initials:'SB', dept:'serv', avg:25.0, contract:25, type:'DEL', wageType:'hour',  wage:186, exception:false, canWorkAlone:true,  absences:[] },
+      { initials:'LR', dept:'serv', avg:5.0,  contract:0,  type:'TIM', wageType:'hour',  wage:170, exception:false, canWorkAlone:false, absences:[] },
+      // Kök
+      { initials:'GP', dept:'kok',  avg:40.0, contract:40, type:'HEL', wageType:'month', wage:39500, exception:false, canWorkAlone:true,  absences:[] },
+      { initials:'AF', dept:'kok',  avg:28.0, contract:30, type:'DEL', wageType:'hour',  wage:208, exception:false, canWorkAlone:true,  absences:[] },
+      { initials:'TC', dept:'kok',  avg:8.0,  contract:0,  type:'TIM', wageType:'hour',  wage:182, exception:false, canWorkAlone:false, absences:[] },
+    ],
+  };
+  return {
+    employees: JSON.parse(JSON.stringify(CREWS[key] || [])),
+    schedule: JSON.parse(JSON.stringify(schedule)),  // återanvänd Speakers veckomall som bas
+    bbOpenings: JSON.parse(JSON.stringify(bbOpenings)),
+    bbNeed: JSON.parse(JSON.stringify(bbNeed)),
+    periodWeeks: [],
+    savedSchedules: [],
+  };
+}
 
 // Spara nuvarande globala state till aktiv restaurang i RESTAURANT_DATA
 function saveCurrentRestaurantData() {
@@ -16736,6 +16772,11 @@ if (_loaded) {
     if (typeof renderRotatedSchedule === 'function') renderRotatedSchedule();
   }, 0);
 }
+
+// Synka pitch-intro-restaurang-väljaren mot aktuell restaurang (efter loadFromStorage)
+document.querySelectorAll('#pitchRestSwitch .pi-rs-btn').forEach(b => {
+  b.classList.toggle('active', b.dataset.rest === currentRestaurant);
+});
 
 // Initial render om vi laddar direkt på bemanningsbehov-steget
 if (document.querySelector('.step-content[data-content="2"].active')) {
