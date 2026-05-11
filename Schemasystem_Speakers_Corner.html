@@ -6479,11 +6479,11 @@
     <button class="pitch-intro-cta" onclick="startPitchDemo()">Starta demo →</button>
 
     <div class="pitch-intro-foot">
-      <span>Visita / Gröna Riksavtalet</span>
+      <span>Visita / Gröna Riksavtalet 2025–2027</span>
       <span class="dot">·</span>
-      <span>Servis · Kök · OB · 11h vila</span>
+      <span>Servis · Kök · OB · 11h vila &amp; 13h-tak</span>
       <span class="dot">·</span>
-      <span>11h vila &amp; 13h-tak inbyggt</span>
+      <span>Caspeco-export</span>
     </div>
   </div>
 </div>
@@ -15386,11 +15386,15 @@ function seedDemoRestaurant(key) {
       { initials:'TC', dept:'kok',  avg:8.0,  contract:0,  type:'TIM', wageType:'hour',  wage:182, exception:false, canWorkAlone:false, absences:[] },
     ],
   };
+  // Schedule MÅSTE vara tom — Speakers veckomall refererar Speakers-initialer
+  // som inte finns i andra restaurangernas crew. Tom = AI-generering från noll
+  // som dessutom är bättre demo (visar magin).
+  const emptySchedule = { A: {0:[],1:[],2:[],3:[],4:[],5:[],6:[]}, B: {0:[],1:[],2:[],3:[],4:[],5:[],6:[]} };
   return {
     employees: JSON.parse(JSON.stringify(CREWS[key] || [])),
-    schedule: JSON.parse(JSON.stringify(schedule)),  // återanvänd Speakers veckomall som bas
-    bbOpenings: JSON.parse(JSON.stringify(bbOpenings)),
-    bbNeed: JSON.parse(JSON.stringify(bbNeed)),
+    schedule: emptySchedule,
+    bbOpenings: JSON.parse(JSON.stringify(bbOpenings)),  // OK: bbOpenings refererar bara tider, inte initialer
+    bbNeed: JSON.parse(JSON.stringify(bbNeed)),          // OK: bbNeed är bara antal per dag/block
     periodWeeks: [],
     savedSchedules: [],
   };
