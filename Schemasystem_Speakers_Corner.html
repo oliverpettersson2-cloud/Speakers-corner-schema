@@ -12297,15 +12297,20 @@ renderWeekTabs();
 renderRotatedSchedule();
 
 function formatDateShort(date) {
-  const d = date.getDate();
+  // Auto-konvertera från string/timestamp (sparat i localStorage som JSON)
+  const dt = (date instanceof Date) ? date : new Date(date);
+  if (isNaN(dt.getTime())) return '—';
+  const d = dt.getDate();
   const months = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
-  return `${d} ${months[date.getMonth()]}`;
+  return `${d} ${months[dt.getMonth()]}`;
 }
 
 function formatDateRange(startDate) {
-  const end = new Date(startDate);
+  const start = (startDate instanceof Date) ? startDate : new Date(startDate);
+  if (isNaN(start.getTime())) return '— – —';
+  const end = new Date(start);
   end.setDate(end.getDate() + 6);
-  return `${formatDateShort(startDate)} – ${formatDateShort(end)}`;
+  return `${formatDateShort(start)} – ${formatDateShort(end)}`;
 }
 
 function getWeekDates(startDate) {
@@ -16117,8 +16122,15 @@ function loadRestaurantData(restKey) {
   Object.assign(bbNeed, JSON.parse(JSON.stringify(data.bbNeed)));
   
   periodWeeks.length = 0;
-  (data.periodWeeks || []).forEach(w => periodWeeks.push(JSON.parse(JSON.stringify(w))));
-  
+  (data.periodWeeks || []).forEach(w => {
+    const copy = JSON.parse(JSON.stringify(w));
+    // Reviva startDate till Date-objekt (JSON-serialisering gör den till sträng)
+    if (copy.startDate && !(copy.startDate instanceof Date)) {
+      copy.startDate = new Date(copy.startDate);
+    }
+    periodWeeks.push(copy);
+  });
+
   return true;
 }
 
@@ -16427,7 +16439,13 @@ function loadSavedSchedule(snapshotId) {
 
   // Ladda till globala variabler
   periodWeeks.length = 0;
-  (snap.weeks || []).forEach(w => periodWeeks.push(JSON.parse(JSON.stringify(w))));
+  (snap.weeks || []).forEach(w => {
+    const copy = JSON.parse(JSON.stringify(w));
+    if (copy.startDate && !(copy.startDate instanceof Date)) {
+      copy.startDate = new Date(copy.startDate);
+    }
+    periodWeeks.push(copy);
+  });
 
   // Re-render
   if (typeof renderRotatedSchedule === 'function') renderRotatedSchedule();
