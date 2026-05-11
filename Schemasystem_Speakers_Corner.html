@@ -9967,7 +9967,8 @@ function epSelectType(type) {
   } else if (type === 'DEL') {
     contractRow.style.opacity = '1';
     contractInput.disabled = false;
-    if ((parseFloat(contractInput.value) || 0) === 0) contractInput.value = 25;
+    // 30h = 75% av heltid är vanligaste deltidsanställningen
+    if ((parseFloat(contractInput.value) || 0) === 0) contractInput.value = 30;
   } else if (type === 'EXT') {
     contractRow.style.opacity = '1';
     contractInput.disabled = false;
@@ -10453,12 +10454,21 @@ function addEmpModalSave() {
   if (!initials || initials.length < 2) {
     initialsEl.classList.add('is-error');
     initialsEl.focus();
+    showAlert({
+      title: 'Initialer saknas',
+      message: 'Fyll i 2–3 bokstäver för att identifiera anställd (t.ex. "MN", "AHE"). Klicka i fältet ovan och skriv.',
+      type: 'warn',
+    });
     return;
   }
   if (employees.find(e => e.initials === initials)) {
     initialsEl.classList.add('is-error');
-    alert(`${initials} finns redan.`);
     initialsEl.focus();
+    showAlert({
+      title: `${initials} finns redan`,
+      message: 'Det finns redan en anställd med dessa initialer. Välj andra (t.ex. lägg till en siffra eller bokstav).',
+      type: 'warn',
+    });
     return;
   }
   
@@ -10469,7 +10479,8 @@ function addEmpModalSave() {
   let contract = 0;
   if (type === 'HEL') contract = 40;
   else if (type === 'DEL') {
-    contract = parseFloat(document.getElementById('addEmpContract').value) || 25;
+    // Default 30 = 75% av heltid — vanligaste deltidsanställningen i restaurangbranschen
+    contract = parseFloat(document.getElementById('addEmpContract').value) || 30;
   }
   
   // Bestäm lönetyp och lön
@@ -10503,14 +10514,10 @@ function addEmpModalSave() {
   if (typeof persistAll === 'function') persistAll();
 }
 
-// Stäng vid klick på overlay (utanför modalen)
+// Stäng INTE vid klick på overlay (för säkert) — användaren måste klicka Avbryt
+// eller trycka Esc. Förhindrar att data tappas vid oavsiktligt klick.
 document.addEventListener('DOMContentLoaded', () => {
-  const overlay = document.getElementById('addEmpModalOverlay');
-  if (overlay) {
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) addEmpModalCancel();
-    });
-  }
+  // Tidigare: klick utanför stängde modalen. Borttaget för att skydda inmatad data.
   // Auto-uppercase + remove error vid input
   const initialsInput = document.getElementById('addEmpInitials');
   if (initialsInput) {
