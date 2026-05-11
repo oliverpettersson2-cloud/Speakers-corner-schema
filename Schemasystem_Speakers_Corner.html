@@ -15538,14 +15538,21 @@ function generateSchedulesForPeriod() {
   }
 
   // ============ STEG 4: FAS 1 — HEL till 100% av kontrakt ============
-  // Iterera tills inget mer kan tilldelas (round-robin för rättvisa)
+  // Round-robin: den HEL som har LÄGST andel av kontrakt fyllt går först
+  // i varje iteration. Förhindrar att en flexibel HEL stjäl all kapacitet
+  // medan en regel-blockerad HEL fastnar (typ VR vs SS-buggen).
   let progress = true;
   while (progress) {
     progress = false;
     const heltidare = employees.filter(e => e.type === 'HEL' && e.contract > 0);
-    for (const emp of heltidare) {
-      for (let weekIdx = 0; weekIdx < wizPeriodWeeks; weekIdx++) {
-        // Tilldela ett pass i taget per emp för rättvis fördelning över personer
+    for (let weekIdx = 0; weekIdx < wizPeriodWeeks; weekIdx++) {
+      // Sortera HEL den här veckan så minst-fyllda går först
+      const sortedHeltidare = [...heltidare].sort((a, b) => {
+        const aRatio = (weeklyHoursTracker[weekIdx][a.initials] || 0) / a.contract;
+        const bRatio = (weeklyHoursTracker[weekIdx][b.initials] || 0) / b.contract;
+        return aRatio - bRatio;
+      });
+      for (const emp of sortedHeltidare) {
         const currentHours = weeklyHoursTracker[weekIdx][emp.initials] || 0;
         if (currentHours >= emp.contract) continue;
         const available = allSlots.filter(s =>
@@ -15560,12 +15567,18 @@ function generateSchedulesForPeriod() {
   }
 
   // ============ STEG 5: FAS 2 — DEL till 50% av kontrakt (round-robin) ============
+  // Samma sort-logik som FAS 1: minst-fylld DEL går först per iteration
   progress = true;
   while (progress) {
     progress = false;
     const deltidare = employees.filter(e => e.type === 'DEL' && e.contract > 0);
-    for (const emp of deltidare) {
-      for (let weekIdx = 0; weekIdx < wizPeriodWeeks; weekIdx++) {
+    for (let weekIdx = 0; weekIdx < wizPeriodWeeks; weekIdx++) {
+      const sortedDeltidare = [...deltidare].sort((a, b) => {
+        const aRatio = (weeklyHoursTracker[weekIdx][a.initials] || 0) / a.contract;
+        const bRatio = (weeklyHoursTracker[weekIdx][b.initials] || 0) / b.contract;
+        return aRatio - bRatio;
+      });
+      for (const emp of sortedDeltidare) {
         const target = emp.contract * 0.5;
         const currentHours = weeklyHoursTracker[weekIdx][emp.initials] || 0;
         if (currentHours >= target) continue;
@@ -15585,8 +15598,13 @@ function generateSchedulesForPeriod() {
   while (progress) {
     progress = false;
     const deltidare = employees.filter(e => e.type === 'DEL' && e.contract > 0);
-    for (const emp of deltidare) {
-      for (let weekIdx = 0; weekIdx < wizPeriodWeeks; weekIdx++) {
+    for (let weekIdx = 0; weekIdx < wizPeriodWeeks; weekIdx++) {
+      const sortedDeltidare = [...deltidare].sort((a, b) => {
+        const aRatio = (weeklyHoursTracker[weekIdx][a.initials] || 0) / a.contract;
+        const bRatio = (weeklyHoursTracker[weekIdx][b.initials] || 0) / b.contract;
+        return aRatio - bRatio;
+      });
+      for (const emp of sortedDeltidare) {
         const currentHours = weeklyHoursTracker[weekIdx][emp.initials] || 0;
         if (currentHours >= emp.contract) continue;
         const available = allSlots.filter(s =>
@@ -15604,14 +15622,20 @@ function generateSchedulesForPeriod() {
   // Visita-avtalet 2025-: deltidsanställd kan jobba upp till 40h/v som
   // "vikariat eller tillfälligt utökat behov" utan att räknas som mertid.
   // Algoritmen utnyttjar denna kapacitet INNAN den faller till TIM/EXT eller öppet pass.
+  // Sortering: minst-timmar först (rättvis fördelning av extra-pass).
   progress = true;
   while (progress) {
     progress = false;
     const deltidare = employees.filter(e => e.type === 'DEL' && e.contract > 0);
-    for (const emp of deltidare) {
-      for (let weekIdx = 0; weekIdx < wizPeriodWeeks; weekIdx++) {
+    for (let weekIdx = 0; weekIdx < wizPeriodWeeks; weekIdx++) {
+      const sortedDeltidare = [...deltidare].sort((a, b) => {
+        const aHours = weeklyHoursTracker[weekIdx][a.initials] || 0;
+        const bHours = weeklyHoursTracker[weekIdx][b.initials] || 0;
+        return aHours - bHours;
+      });
+      for (const emp of sortedDeltidare) {
         const currentHours = weeklyHoursTracker[weekIdx][emp.initials] || 0;
-        if (currentHours >= 40) continue; // hård cap vid 40h (övertid om över)
+        if (currentHours >= 40) continue;
         const available = allSlots.filter(s =>
           s.weekIdx === weekIdx && s.assigned === null && canAssign(s, emp)
         );
