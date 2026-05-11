@@ -6213,9 +6213,280 @@
   .bb-foot-stat .val.warn { color: var(--warn); }
   .bb-foot-stat .val.acc { color: var(--accent); }
 
+  /* ============ PITCH-INTRO HERO ============ */
+  .pitch-intro {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at 50% 30%, #faf7f0 0%, #ebe5d4 60%, #d8d0bd 100%);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+    overflow-y: auto;
+    opacity: 1;
+    transition: opacity 0.5s ease;
+  }
+  .pitch-intro.hide { opacity: 0; pointer-events: none; }
+  .pitch-intro-inner {
+    max-width: 760px;
+    width: 100%;
+    text-align: center;
+  }
+  .pitch-intro-brand {
+    font-family: 'Fraunces', serif;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 32px;
+    display: inline-block;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--accent);
+  }
+  .pitch-intro-brand::before { content: "◐ "; }
+  .pitch-intro-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(46px, 8vw, 88px);
+    font-weight: 600;
+    line-height: 0.95;
+    letter-spacing: -0.04em;
+    color: var(--ink);
+    margin: 0 0 8px;
+  }
+  .pitch-intro-title .em {
+    font-style: italic;
+    color: var(--accent);
+  }
+  .pitch-intro-sub {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(20px, 3vw, 28px);
+    font-weight: 400;
+    color: var(--ink-soft);
+    margin: 0 0 56px;
+    font-style: italic;
+  }
+  .pitch-intro-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    max-width: 640px;
+    margin: 0 auto 56px;
+    padding: 28px 24px;
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  @media (max-width: 600px) {
+    .pitch-intro-stats { grid-template-columns: 1fr; gap: 16px; }
+  }
+  .pitch-intro-stat-num {
+    font-family: 'Fraunces', serif;
+    font-size: 34px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    color: var(--ink);
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .pitch-intro-stat-num .accent { color: var(--accent); }
+  .pitch-intro-stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    line-height: 1.4;
+  }
+  .pitch-intro-rest-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 12px;
+  }
+  .pitch-intro-rest-switch {
+    display: inline-flex;
+    background: var(--ink);
+    padding: 4px;
+    border-radius: 2px;
+    margin-bottom: 32px;
+    box-shadow: 0 2px 8px rgba(26,24,21,.12);
+  }
+  .pi-rs-btn {
+    background: transparent;
+    border: 0;
+    color: rgba(244,241,234,0.55);
+    padding: 10px 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    border-radius: 1px;
+    transition: all .15s;
+  }
+  .pi-rs-btn:hover { color: rgba(244,241,234,0.9); }
+  .pi-rs-btn.active {
+    background: var(--accent);
+    color: white;
+  }
+  .pitch-intro-cta {
+    display: block;
+    margin: 0 auto 28px;
+    background: var(--accent);
+    color: white;
+    border: 0;
+    padding: 18px 56px;
+    font-family: 'Fraunces', serif;
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    border-radius: 2px;
+    box-shadow: 0 4px 14px rgba(184, 65, 14, 0.3);
+    transition: all .2s;
+  }
+  .pitch-intro-cta:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(184, 65, 14, 0.4);
+    background: #a3370b;
+  }
+  .pitch-intro-cta:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(184, 65, 14, 0.4);
+  }
+  .pitch-intro-foot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-faint);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    flex-wrap: wrap;
+  }
+  .pitch-intro-foot .dot { color: var(--accent); }
+
+  /* Återställ-demo-knapp i topbar */
+  .demo-reset-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(244,241,234,0.15);
+    color: rgba(244,241,234,0.65);
+    padding: 6px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 1px;
+    transition: all .15s;
+  }
+  .demo-reset-btn:hover {
+    background: rgba(255,255,255,0.14);
+    color: white;
+    border-color: rgba(244,241,234,0.3);
+  }
+
+  /* ============ AI-LOADER MULTI-STAGE ============ */
+  .ai-loader-stages {
+    margin: 18px 0 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 110px;
+    text-align: left;
+  }
+  .ai-stage {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.3s, transform 0.3s;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .ai-stage.visible { opacity: 1; transform: translateY(0); }
+  .ai-stage.done { color: var(--ink); }
+  .ai-stage-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--line);
+    color: var(--ink-faint);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    transition: all 0.25s;
+  }
+  .ai-stage.active .ai-stage-icon {
+    background: var(--accent);
+    color: white;
+    animation: ai-pulse 1s ease-in-out infinite;
+  }
+  .ai-stage.done .ai-stage-icon {
+    background: var(--ok);
+    color: white;
+  }
+  @keyframes ai-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(184, 65, 14, 0.5); }
+    50% { box-shadow: 0 0 0 6px rgba(184, 65, 14, 0); }
+  }
+
   </style>
 </head>
 <body>
+
+<!-- ============ PITCH-INTRO HERO ============ -->
+<div class="pitch-intro" id="pitchIntroOverlay">
+  <div class="pitch-intro-inner">
+    <div class="pitch-intro-brand">Mise en Place</div>
+    <h1 class="pitch-intro-title">Schema på <span class="em">4 minuter</span>.</h1>
+    <p class="pitch-intro-sub">Inte 3 timmar.</p>
+
+    <div class="pitch-intro-stats">
+      <div class="pitch-intro-stat">
+        <div class="pitch-intro-stat-num">12<span class="accent"> h</span></div>
+        <div class="pitch-intro-stat-label">Sparas per chef &amp; månad</div>
+      </div>
+      <div class="pitch-intro-stat">
+        <div class="pitch-intro-stat-num">100<span class="accent"> %</span></div>
+        <div class="pitch-intro-stat-label">Visita-avtalet 2025–2027</div>
+      </div>
+      <div class="pitch-intro-stat">
+        <div class="pitch-intro-stat-num">Caspeco</div>
+        <div class="pitch-intro-stat-label">Lön-export inbyggd</div>
+      </div>
+    </div>
+
+    <div class="pitch-intro-rest-label">Välj demo-restaurang</div>
+    <div class="pitch-intro-rest-switch" id="pitchRestSwitch">
+      <button class="pi-rs-btn active" data-rest="speakers">Speakers Corner</button>
+      <button class="pi-rs-btn" data-rest="tycho">Tycho Brahe</button>
+      <button class="pi-rs-btn" data-rest="fellini">Fellini</button>
+    </div>
+
+    <button class="pitch-intro-cta" onclick="startPitchDemo()">Starta demo →</button>
+
+    <div class="pitch-intro-foot">
+      <span>Visita / Gröna Riksavtalet</span>
+      <span class="dot">·</span>
+      <span>Servis · Kök · OB · 11h vila</span>
+      <span class="dot">·</span>
+      <span>11h vila &amp; 13h-tak inbyggt</span>
+    </div>
+  </div>
+</div>
 
 <div class="topbar">
   <div class="brand">
@@ -6227,6 +6498,7 @@
     <button class="rs-btn active" data-rest="speakers">Speakers Corner</button>
     <button class="rs-btn" data-rest="tycho">Tycho Brahe</button>
   </div>
+  <button class="demo-reset-btn" onclick="showPitchIntro()" title="Återgå till intro-vyn">↻ Intro</button>
 </div>
 
 <div class="stepper">
@@ -8025,9 +8297,27 @@
 <!-- ============ AI-GENERERAR LOADER ============ -->
 <div class="ai-loader-overlay" id="aiLoaderOverlay">
   <div class="ai-loader-card">
-    <div class="ai-loader-icon">⏳</div>
+    <div class="ai-loader-icon">◐</div>
     <div class="ai-loader-title">AI-genererar schema</div>
     <div class="ai-loader-sub" id="aiLoaderSub">Tilldelar pass enligt mall &amp; bemanningsbehov…</div>
+    <div class="ai-loader-stages" id="aiLoaderStages">
+      <div class="ai-stage" data-stage="0">
+        <div class="ai-stage-icon">1</div>
+        <span>Läser veckomall &amp; bemanningsbehov…</span>
+      </div>
+      <div class="ai-stage" data-stage="1">
+        <div class="ai-stage-icon">2</div>
+        <span>Tilldelar pass — HEL först, sedan DEL, TIM, EXT</span>
+      </div>
+      <div class="ai-stage" data-stage="2">
+        <div class="ai-stage-icon">3</div>
+        <span>Tillämpar 11 h vila &amp; max 13 h/pass</span>
+      </div>
+      <div class="ai-stage" data-stage="3">
+        <div class="ai-stage-icon">4</div>
+        <span>Balanserar OB &amp; helger mellan personalen</span>
+      </div>
+    </div>
     <div class="ai-loader-bar"><div class="ai-loader-bar-fill"></div></div>
   </div>
 </div>
@@ -14810,9 +15100,9 @@ async function bbGenerateSchedule() {
     return;
   }
 
-  // Vänta in resterande tid till totalt 3 sekunder
+  // Vänta in resterande tid till totalt 3.4s (alla 4 AI-stages + sista ✓-pulse)
   const _elapsed = Date.now() - _aiLoaderStart;
-  if (_elapsed < 3000) await new Promise(r => setTimeout(r, 3000 - _elapsed));
+  if (_elapsed < 3400) await new Promise(r => setTimeout(r, 3400 - _elapsed));
   hideAILoader();
   
   if (!result || !result.weeklyShifts) {
@@ -15755,7 +16045,9 @@ function showToast({ title, detail, type = 'success', duration = 4500 } = {}) {
   return toast;
 }
 
-// =========== AI-LOADER ===========
+// =========== AI-LOADER (multi-stage WOW-moment) ===========
+let _aiLoaderStageTimers = [];
+
 function showAILoader(subText) {
   const overlay = document.getElementById('aiLoaderOverlay');
   if (!overlay) return;
@@ -15763,18 +16055,55 @@ function showAILoader(subText) {
     const sub = document.getElementById('aiLoaderSub');
     if (sub) sub.textContent = subText;
   }
-  // Restart progress-bar-animationen genom att ta bort + lägga tillbaka klassen
+  // Restart progress-bar-animationen
   const fill = overlay.querySelector('.ai-loader-bar-fill');
   if (fill) {
     fill.style.animation = 'none';
-    void fill.offsetWidth; // reflow så animation kan startas om
+    void fill.offsetWidth;
     fill.style.animation = '';
   }
+  // Reset alla stages
+  _aiLoaderStageTimers.forEach(t => clearTimeout(t));
+  _aiLoaderStageTimers = [];
+  const stages = overlay.querySelectorAll('.ai-stage');
+  stages.forEach(s => s.classList.remove('visible', 'active', 'done'));
+
+  // Stages tickar igenom med dramatisk timing
+  // Total ~2.8s — algoritmen brukar köra på <100ms, så vi väntar in totalt 3s i wrapper-koden
+  const SCHEDULE = [
+    { at: 80,   action: () => activateStage(0) },
+    { at: 720,  action: () => { completeStage(0); activateStage(1); } },
+    { at: 1380, action: () => { completeStage(1); activateStage(2); } },
+    { at: 2000, action: () => { completeStage(2); activateStage(3); } },
+    { at: 2720, action: () => { completeStage(3); } },
+  ];
+  SCHEDULE.forEach(({ at, action }) => {
+    _aiLoaderStageTimers.push(setTimeout(action, at));
+  });
+
   overlay.classList.add('open');
 }
+
+function activateStage(idx) {
+  const stage = document.querySelector(`.ai-stage[data-stage="${idx}"]`);
+  if (!stage) return;
+  stage.classList.add('visible', 'active');
+}
+function completeStage(idx) {
+  const stage = document.querySelector(`.ai-stage[data-stage="${idx}"]`);
+  if (!stage) return;
+  stage.classList.remove('active');
+  stage.classList.add('done');
+  // Byt siffra till ✓
+  const icon = stage.querySelector('.ai-stage-icon');
+  if (icon) icon.textContent = '✓';
+}
+
 function hideAILoader() {
   const overlay = document.getElementById('aiLoaderOverlay');
   if (overlay) overlay.classList.remove('open');
+  _aiLoaderStageTimers.forEach(t => clearTimeout(t));
+  _aiLoaderStageTimers = [];
 }
 
 // =========== SCHEMAREGLER (globala mjuka/hårda regler för algoritmen) ===========
@@ -16344,6 +16673,58 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+// =============================================================
+// PITCH-INTRO HERO — pitch-läge: stor "Schema på 4 min" innan app
+// =============================================================
+function startPitchDemo() {
+  // 1. Vilken restaurang har Oliver klickat?
+  const chosen = document.querySelector('#pitchRestSwitch .pi-rs-btn.active');
+  const rest = chosen ? chosen.dataset.rest : 'speakers';
+  // 2. Switcha till den restaurangen om vi inte redan är där
+  if (typeof switchRestaurant === 'function' && currentRestaurant !== rest) {
+    switchRestaurant(rest);
+  } else {
+    // Säkerställ att topbar-knappen blir aktiv
+    document.querySelectorAll('.restaurant-switch .rs-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.rest === rest);
+    });
+  }
+  // 3. Fade out hero
+  const overlay = document.getElementById('pitchIntroOverlay');
+  if (!overlay) return;
+  overlay.classList.add('hide');
+  setTimeout(() => { overlay.style.display = 'none'; }, 500);
+}
+
+function showPitchIntro() {
+  const overlay = document.getElementById('pitchIntroOverlay');
+  if (!overlay) return;
+  overlay.style.display = 'flex';
+  // Force reflow så transition fungerar när vi sen tar bort .hide
+  void overlay.offsetWidth;
+  overlay.classList.remove('hide');
+  // Synka pitch-rest-switch med nuvarande aktiv
+  document.querySelectorAll('#pitchRestSwitch .pi-rs-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.rest === currentRestaurant);
+  });
+}
+
+// Klick-handler för restaurang-väljaren i hero
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('#pitchRestSwitch .pi-rs-btn');
+  if (!btn) return;
+  document.querySelectorAll('#pitchRestSwitch .pi-rs-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+});
+
+// URL-flagga: ?skip=1 hoppar över intron (för utveckling)
+(function maybeSkipPitchIntro() {
+  if (new URLSearchParams(location.search).has('skip')) {
+    const overlay = document.getElementById('pitchIntroOverlay');
+    if (overlay) overlay.style.display = 'none';
+  }
+})();
 
 // Försök ladda från localStorage vid start
 const _loaded = loadFromStorage();
