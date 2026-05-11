@@ -6499,6 +6499,7 @@
     <button class="rs-btn" data-rest="tycho">Tycho Brahe</button>
   </div>
   <button class="demo-reset-btn" onclick="showPitchIntro()" title="Återgå till intro-vyn">↻ Intro</button>
+  <button class="demo-reset-btn" onclick="reportBug()" title="Rapportera ett problem eller önskemål" style="margin-left: 6px;">↯ Rapportera fel</button>
 </div>
 
 <div class="stepper">
@@ -16757,6 +16758,37 @@ document.addEventListener('click', (e) => {
   document.querySelectorAll('#pitchRestSwitch .pi-rs-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
 });
+
+// =============================================================
+// BUG-RAPPORT — öppnar mailto med kontext förifyllt
+// =============================================================
+function reportBug() {
+  const restName = (RESTAURANTS[currentRestaurant] || {}).name || currentRestaurant;
+  const activeStep = document.querySelector('.step.active');
+  const stepName = activeStep
+    ? activeStep.querySelector('.step-title')?.textContent + ' (steg ' + activeStep.dataset.step + ')'
+    : 'okänt';
+  const ts = new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Stockholm' });
+  const ua = navigator.userAgent.slice(0, 120);
+  const url = location.href;
+
+  const body =
+    'Beskriv problemet eller önskemålet här:\n' +
+    '\n\n\n' +
+    '---\n' +
+    'Kontext (skicka med — hjälper felsökning):\n' +
+    `Restaurang: ${restName}\n` +
+    `Steg: ${stepName}\n` +
+    `Tid: ${ts}\n` +
+    `URL: ${url}\n` +
+    `Browser: ${ua}\n`;
+
+  const mailto = 'mailto:oliver.pettersson2@gmail.com' +
+    '?subject=' + encodeURIComponent(`Schemat: bug/önskemål (${restName})`) +
+    '&body=' + encodeURIComponent(body);
+
+  window.location.href = mailto;
+}
 
 // URL-flagga: ?skip=1 hoppar över intron (för utveckling)
 (function maybeSkipPitchIntro() {
