@@ -14919,8 +14919,14 @@ function generateSchedulesForPeriod() {
     if (!emp) return false;
     if (slot.assigned) return false;
     if (emp.dept !== slot.dept) return false;
-    // Max 13h pass
-    if (slot.hours > 13) return false;
+    // Max 13h pass — TILLÅTS vid dispens (exception:true) eller om mallen
+    // specifikt föreslår denna person (Oliver har medvetet lagt 13h+ pass
+    // i mallen, t.ex. lör-stäng). Annars hård gräns 13h.
+    if (slot.hours > 13) {
+      const hasDispensation = emp.exception === true;
+      const isSuggestedHere = slot.suggested === emp.initials;
+      if (!hasDispensation && !isSuggestedHere) return false;
+    }
     const weekShifts = weeklyShifts[slot.weekIdx];
     // Inte redan bokad samma dag
     if (weekShifts[slot.dayIdx].some(s => s.i === emp.initials)) return false;
