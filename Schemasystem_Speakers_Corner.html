@@ -6393,6 +6393,134 @@
     border-color: rgba(244,241,234,0.3);
   }
 
+  /* ============ AVTALS-REGLER MODAL ============ */
+  .rulebook-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(26, 24, 21, 0.45);
+    z-index: 9000;
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 60px 20px 40px;
+    overflow-y: auto;
+  }
+  .rulebook-overlay.open { display: flex; }
+  .rulebook-modal {
+    background: var(--bg-paper);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    max-width: 820px;
+    width: 100%;
+    box-shadow: 0 20px 60px rgba(26,24,21,0.25);
+    padding: 32px 36px;
+  }
+  .rulebook-head {
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 18px;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .rulebook-title {
+    font-family: 'Fraunces', serif;
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  .rulebook-title .em { color: var(--accent); font-style: italic; }
+  .rulebook-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-top: 6px;
+  }
+  .rulebook-close {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink-soft);
+    width: 32px;
+    height: 32px;
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .rulebook-close:hover { background: var(--line-soft); color: var(--ink); }
+  .rulebook-section {
+    margin-bottom: 28px;
+  }
+  .rulebook-section-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--ink);
+    border-bottom: 1px solid var(--line-soft);
+    padding-bottom: 6px;
+  }
+  .rulebook-rule {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    gap: 14px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line-soft);
+    align-items: start;
+  }
+  .rulebook-rule:last-child { border-bottom: 0; }
+  .rulebook-rule-status {
+    font-size: 16px;
+    line-height: 1.4;
+    text-align: center;
+  }
+  .rulebook-rule-status.ok { color: var(--ok); }
+  .rulebook-rule-status.partial { color: var(--warn); }
+  .rulebook-rule-status.todo { color: var(--ink-faint); }
+  .rulebook-rule-text {
+    line-height: 1.45;
+  }
+  .rulebook-rule-name {
+    font-weight: 600;
+    color: var(--ink);
+    font-size: 14px;
+  }
+  .rulebook-rule-detail {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-top: 3px;
+  }
+  .rulebook-rule-source {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    text-align: right;
+    line-height: 1.4;
+  }
+  .rulebook-foot {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-faint);
+    letter-spacing: 0.05em;
+    line-height: 1.5;
+  }
+  .rulebook-foot a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid var(--accent-soft);
+  }
+  .rulebook-foot a:hover { border-bottom-color: var(--accent); }
+
   /* ============ AI-LOADER MULTI-STAGE ============ */
   .ai-loader-stages {
     margin: 18px 0 8px;
@@ -6499,6 +6627,7 @@
     <button class="rs-btn" data-rest="tycho">Tycho Brahe</button>
   </div>
   <button class="demo-reset-btn" onclick="showPitchIntro()" title="Återgå till intro-vyn">↻ Intro</button>
+  <button class="demo-reset-btn" onclick="showRulebook()" title="Vilka avtalsregler systemet följer" style="margin-left: 6px;">§ Avtals-regler</button>
   <button class="demo-reset-btn" onclick="reportBug()" title="Rapportera ett problem eller önskemål" style="margin-left: 6px;">↯ Rapportera fel</button>
 </div>
 
@@ -8295,6 +8424,207 @@
 <!-- ============ TOAST-CONTAINER ============ -->
 <div class="toast-stack" id="toastStack"></div>
 
+<!-- ============ AVTALS-REGLER MODAL ============ -->
+<div class="rulebook-overlay" id="rulebookOverlay">
+  <div class="rulebook-modal">
+    <div class="rulebook-head">
+      <div>
+        <div class="rulebook-title">§ Avtals-regler <span class="em">som systemet följer</span></div>
+        <div class="rulebook-sub">Visita / Gröna Riksavtalet 2025–2027 · Arbetstidslagen (1982:673)</div>
+      </div>
+      <button class="rulebook-close" onclick="hideRulebook()" title="Stäng">×</button>
+    </div>
+
+    <div class="rulebook-section">
+      <div class="rulebook-section-title">Vila &amp; arbetstid (arbetstidslagen)</div>
+
+      <div class="rulebook-rule">
+        <div class="rulebook-rule-status ok">✓</div>
+        <div class="rulebook-rule-text">
+          <div class="rulebook-rule-name">11 timmars dygnsvila</div>
+          <div class="rulebook-rule-detail">Mellan två arbetspass. Algoritmen avvisar pass som bryter detta.</div>
+        </div>
+        <div class="rulebook-rule-source">ATL § 13</div>
+      </div>
+
+      <div class="rulebook-rule">
+        <div class="rulebook-rule-status ok">✓</div>
+        <div class="rulebook-rule-text">
+          <div class="rulebook-rule-name">36 timmars sammanhängande veckovila</div>
+          <div class="rulebook-rule-detail">Per 7-dagarsperiod. Algoritmen letar cykliskt över söndag-natt → måndag.</div>
+        </div>
+        <div class="rulebook-rule-source">ATL § 14</div>
+      </div>
+
+      <div class="rulebook-rule">
+        <div class="rulebook-rule-status ok">✓</div>
+        <div class="rulebook-rule-text">
+          <div class="rulebook-rule-name">Max 13 timmars pass</div>
+          <div class="rulebook-rule-detail">Pass över 13h splittas automatiskt vid 16:00 eller mittpunkten (två olika anställda fyller).</div>
+        </div>
+        <div class="rulebook-rule-source">ATL § 13 b</div>
+      </div>
+
+      <div class="rulebook-rule">
+        <div class="rulebook-rule-status ok">✓</div>
+        <div class="rulebook-rule-text">
+          <div class="rulebook-rule-name">8h dygnsvila vid Visita-dispens</div>
+          <div class="rulebook-rule-detail">Tillåten vid "tillfällig avvikelse" (stäng → öppna nästa dag). Kräver <code>exception: true</code> på anställd.</div>
+        </div>
+        <div class="rulebook-rule-source">Visita / ATL § 13</div>
+      </div>
+
+      <div class="rulebook-rule">
+        <div class="rulebook-rule-status ok">✓</div>
+        <div class="rulebook-rule-text">
+          <div class="rulebook-rule-name">Obetald rast räknas av</div>
+          <div class="rulebook-rule-detail">Pass 5–8h: 15 min. Pass &gt;8h: 30 min. Drar av från arbetstid i kontrakt-fyllnad.</div>
+        </div>
+        <div class="rulebook-rule-source">ATL § 15</div>
+      </div>
+    </div>
+
+    <div class="rulebook-section">
+      <div class="rulebook-section-title">Anställning &amp; arbetstid (Visita)</div>
+
+      <div class="rulebook-rule">
+        <div class="rulebook-rule-status ok">✓</div>
+        <div class="rulebook-rule-text">
+          <div class="rulebook-rule-name">DEL upp till 40h som vikariat</div>
+          <div class="rulebook-rule-detail">Mertid borttaget 1 juni 2025. DEL kan jobba över kontrakt upp till 40h utan att räknas som övertid.</div>
+        </div>
+        <div class="rulebook-rule-source">Gröna Riksen 2025</div>
+      </div>
+
+      <div class="rulebook-rule">
+        <div class="rulebook-rule-status ok">✓</div>
+        <div class="rulebook-rule-text">
+          <div class="rulebook-rule-name">HEL prioriteras före DEL</div>
+          <div class="rulebook-rule-detail">Algoritmen fyller alla heltidsanställda till 100% av kontrakt INNAN deltidare får sitt första pass.</div>
+        </div>
+        <div class="rulebook-rule-source">Visita-praxis</div>
+      </div>
+
+      <div class="rulebook-rule">
+        <div class="rulebook-rule-status partial">◐</div>
+        <div class="rulebook-rule-text">
+          <div class="rulebook-rule-name">Säsongsanställning</div>
+          <div class="rulebook-rule-detail">Fellini sommarstängt 1 juli–1 september markeras. Full säsongsanställning-status saknas ännu.</div>
+        </div>
+        <div class="rulebook-rule-source">Visita</div>
+      </div>
+
+      <div class="rulebook-rule">
+        <div class="rulebook-rule-status todo">○</div>
+        <div class="rulebook-rule-text">
+          <div class="rulebook-rule-name">Beräkningsperiod 26 veckor (HEL ≥70%)</div>
+          <div class="rulebook-rule-detail">Snittarbetstid över upp till 26v istället för per vecka. Algoritmen kollar idag per vecka — refactor planerad.</div>
+        </div>
+        <div class="rulebook-rule-source">Gröna Riksen 2025</div>
+      </div>
+    </div>
+
+    <div class="rulebook-section">
+      <div class="rulebook-section-title">OB &amp; löner (Gröna Riksen 2025–2027)</div>
+
+      <div class="rulebook-rule">
+        <div class="rulebook-rule-status ok">✓</div>
+        <div class="rulebook-rule-text">
+          <div class="rulebook-rule-name">Vanligt OB-tillägg</div>
+          <div class="rulebook-rule-detail">Mån–fre 20:00 → 06:00, lör 16:00 → 06:00, sön hela dygnet. <strong>26,79 kr/h (2025), 27,59 kr/h (2026)</strong>.</div>
+        </div>
+        <div class="rulebook-rule-source">Gröna Riksen</div>
+      </div>
+
+      <div class="rulebook-rule">
+        <div class="rulebook-rule-status ok">✓</div>
+        <div class="rulebook-rule-text">
+          <div class="rulebook-rule-name">Natt-OB extra (01–06)</div>
+          <div class="rulebook-rule-detail">Utöver vanligt OB. <strong>+23,61 kr/h (2025), +24,31 kr/h (2026)</strong>. Totalt natt 51,90 kr/h 2026.</div>
+        </div>
+        <div class="rulebook-rule-source">Gröna Riksen</div>
+      </div>
+
+      <div class="rulebook-rule">
+        <div class="rulebook-rule-status ok">✓</div>
+        <div class="rulebook-rule-text">
+          <div class="rulebook-rule-name">Storhelg = 100% av timlön</div>
+          <div class="rulebook-rule-detail">När julafton (24 dec) eller nyårsafton (31 dec) infaller på lör/sön. Övriga röda dagar OB-belagda enligt vanliga regler.</div>
+        </div>
+        <div class="rulebook-rule-source">Gröna Riksen 2025</div>
+      </div>
+
+      <div class="rulebook-rule">
+        <div class="rulebook-rule-status ok">✓</div>
+        <div class="rulebook-rule-text">
+          <div class="rulebook-rule-name">Påläggsfaktor 1,4342</div>
+          <div class="rulebook-rule-detail">Arbetsgivaravgift 31,42% + semesterersättning 12% beräknas på bruttolön.</div>
+        </div>
+        <div class="rulebook-rule-source">Skatteverket / sem.lagen</div>
+      </div>
+
+      <div class="rulebook-rule">
+        <div class="rulebook-rule-status todo">○</div>
+        <div class="rulebook-rule-text">
+          <div class="rulebook-rule-name">Lägstalöner per ålder &amp; position</div>
+          <div class="rulebook-rule-detail">Avtalet specificerar minimi per kategori. Idag sätts lön manuellt i UI:t.</div>
+        </div>
+        <div class="rulebook-rule-source">Gröna Riksen</div>
+      </div>
+    </div>
+
+    <div class="rulebook-section">
+      <div class="rulebook-section-title">Kontrakt &amp; algoritm-logik</div>
+
+      <div class="rulebook-rule">
+        <div class="rulebook-rule-status ok">✓</div>
+        <div class="rulebook-rule-text">
+          <div class="rulebook-rule-name">Avdelnings-match (servis / kök)</div>
+          <div class="rulebook-rule-detail">En kock tilldelas inte servis-pass och tvärtom.</div>
+        </div>
+        <div class="rulebook-rule-source">Verksamhetsregel</div>
+      </div>
+
+      <div class="rulebook-rule">
+        <div class="rulebook-rule-status ok">✓</div>
+        <div class="rulebook-rule-text">
+          <div class="rulebook-rule-name">Solo-pass-skydd</div>
+          <div class="rulebook-rule-detail">Anställda utan <code>canWorkAlone</code> (oftast TIM/EXT) tilldelas inte pass där ingen annan finns på avdelningen samtidigt.</div>
+        </div>
+        <div class="rulebook-rule-source">Visita / verksamhetsregel</div>
+      </div>
+
+      <div class="rulebook-rule">
+        <div class="rulebook-rule-status ok">✓</div>
+        <div class="rulebook-rule-text">
+          <div class="rulebook-rule-name">Frånvaroperioder respekteras</div>
+          <div class="rulebook-rule-detail">Semester, sjuk, VAB, föräldraledig — algoritmen tilldelar aldrig pass under registrerad frånvaro.</div>
+        </div>
+        <div class="rulebook-rule-source">Semesterlagen / SFB</div>
+      </div>
+
+      <div class="rulebook-rule">
+        <div class="rulebook-rule-status ok">✓</div>
+        <div class="rulebook-rule-text">
+          <div class="rulebook-rule-name">Anställningsperiod</div>
+          <div class="rulebook-rule-detail">Anställda med start/slut-datum får inte pass utanför sin aktiva period.</div>
+        </div>
+        <div class="rulebook-rule-source">LAS</div>
+      </div>
+    </div>
+
+    <div class="rulebook-foot">
+      <strong>Källor:</strong>
+      <a href="https://www.hrf.net/app/uploads/2025/05/Grona-riksen-2025-2027-1.pdf" target="_blank" rel="noopener">Gröna Riksavtalet 2025–2027 (PDF)</a> ·
+      <a href="https://visita.se/avtal-25/" target="_blank" rel="noopener">Visita Avtal 25</a> ·
+      <a href="https://www.riksdagen.se/sv/dokument-och-lagar/dokument/svensk-forfattningssamling/arbetstidslag-1982673_sfs-1982-673/" target="_blank" rel="noopener">Arbetstidslag (1982:673)</a> ·
+      <a href="https://www.hotellrevyn.se/nya-lagstaloner-och-fler-nyheter-fran-grona-riksavtalet-2025/" target="_blank" rel="noopener">Lägstalöner (Hotellrevyn)</a>
+      <br><br>
+      ✓ = implementerat &nbsp; ◐ = delvis &nbsp; ○ = planerad / kvar att bygga
+    </div>
+  </div>
+</div>
+
 <!-- ============ AI-GENERERAR LOADER ============ -->
 <div class="ai-loader-overlay" id="aiLoaderOverlay">
   <div class="ai-loader-card">
@@ -9387,13 +9717,35 @@ function swedishHolidays(year) {
   ];
 }
 
-// Snabb-check om ett ISO-datum är svensk storhelg
-function isStorhelg(dateISO) {
+// Snabb-check om ett ISO-datum är svensk röd dag (för visualisering)
+function isSwedishHoliday(dateISO) {
   if (!dateISO) return false;
   const y = parseInt(dateISO.slice(0, 4), 10);
   if (!y) return false;
   const list = swedishHolidays(y);
   return list.some(h => _iso(h.date) === dateISO);
+}
+
+// VISITA-AVTALETS STORHELGS-DEFINITION (smal):
+// Storhelgstillägg 100% gäller ENBART för jul- eller nyårsafton som
+// infaller på lördag eller söndag. Övriga röda dagar är redan OB-belagda
+// enligt vanliga regler (söndag = hela dygnet OB).
+// Källa: Gröna Riksavtalet 2025-2027, sammanfattat via Hotellrevyn.
+function isVisitaStorhelg(dateISO) {
+  if (!dateISO) return false;
+  const d = new Date(dateISO + 'T12:00:00');
+  if (isNaN(d.getTime())) return false;
+  const dayOfWeek = d.getDay(); // 0 = sön, 6 = lör
+  if (dayOfWeek !== 0 && dayOfWeek !== 6) return false;
+  const month = d.getMonth(); // 0-indexerat
+  const dayOfMonth = d.getDate();
+  // 24 dec (julafton) eller 31 dec (nyårsafton)
+  return month === 11 && (dayOfMonth === 24 || dayOfMonth === 31);
+}
+
+// Bakåtkompatibel alias (gammal kod använder isStorhelg som bredare definition)
+function isStorhelg(dateISO) {
+  return isVisitaStorhelg(dateISO);
 }
 
 // OB calc — simplified Visita rules:
@@ -9480,25 +9832,41 @@ function getEmpHourlyRate(emp) {
   return emp.wage / 173.3;
 }
 
-function shiftBruttoCost(s, dayIdx, emp) {
+// Auto-hämta datum från periodWeeks om weekIdx+dayIdx är känt (för storhelg-check)
+function _autoLookupDateISO(weekIdx, dayIdx) {
+  if (typeof periodWeeks === 'undefined' || !Array.isArray(periodWeeks)) return null;
+  if (weekIdx == null || dayIdx == null) return null;
+  const wk = periodWeeks[weekIdx];
+  if (!wk || !wk.startDate) return null;
+  try {
+    const d = new Date(wk.startDate);
+    d.setDate(d.getDate() + dayIdx);
+    return d.toISOString().slice(0, 10);
+  } catch (e) { return null; }
+}
+
+function shiftBruttoCost(s, dayIdx, emp, weekIdx) {
   const paid = shiftPaidHours(s);
   const rate = getEmpHourlyRate(emp);
   const ob = shiftOBHours(s, dayIdx);
-  
+
   // Grundlön på alla betalda timmar
   const baseLön = paid * rate;
-  
+
   // OB-tillägg: fasta kronbelopp (ej procent av timlön)
   const obLön = ob.obRegular * OB_REGULAR + ob.obNight * OB_NIGHT_EXTRA;
-  
-  // Storhelgsersättning: 100% av timlönen ovanpå allt
-  const storhelgLön = ob.obStorhelg * rate;
-  
+
+  // VISITA STORHELG: 100% av timlönen ovanpå allt OM dagen är jul/nyårsafton lör/sön.
+  // Hämtar datum från periodWeeks om weekIdx är passat.
+  const dateISO = _autoLookupDateISO(weekIdx, dayIdx);
+  const isStorhelg = isVisitaStorhelg(dateISO);
+  const storhelgLön = (isStorhelg ? paid * rate : 0) + ob.obStorhelg * rate;
+
   return baseLön + obLön + storhelgLön;
 }
 
-function shiftTotalCost(s, dayIdx, emp) {
-  return shiftBruttoCost(s, dayIdx, emp) * PALAGG;
+function shiftTotalCost(s, dayIdx, emp, weekIdx) {
+  return shiftBruttoCost(s, dayIdx, emp, weekIdx) * PALAGG;
 }
 
 function formatKr(n) {
@@ -17046,6 +17414,36 @@ document.addEventListener('click', (e) => {
   if (!btn) return;
   document.querySelectorAll('#pitchRestSwitch .pi-rs-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+});
+
+// =============================================================
+// AVTALS-REGLER (rulebook) — modal som visar vad systemet följer
+// =============================================================
+function showRulebook() {
+  const overlay = document.getElementById('rulebookOverlay');
+  if (overlay) overlay.classList.add('open');
+}
+function hideRulebook() {
+  const overlay = document.getElementById('rulebookOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+// Stäng vid klick på overlay
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('rulebookOverlay');
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) hideRulebook();
+    });
+  }
+});
+
+// Esc-stäng
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const overlay = document.getElementById('rulebookOverlay');
+    if (overlay && overlay.classList.contains('open')) hideRulebook();
+  }
 });
 
 // =============================================================
