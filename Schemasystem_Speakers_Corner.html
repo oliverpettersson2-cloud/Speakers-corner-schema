@@ -9949,22 +9949,29 @@ function epSelectType(type) {
   document.querySelectorAll('#editPersonType button').forEach(b => {
     b.classList.toggle('active', b.dataset.val === type);
   });
-  // Visa eller dölj kontrakts-rad baserat på typ
+  // Kontrakt editerbart enbart för DEL och EXT (Olivers regel)
+  // HEL → låst till 40 (heltid är heltid)
+  // TIM → låst till 0 (timanställd har inget fast kontrakt)
+  // DEL → editerbart, default 25
+  // EXT → editerbart, default 0 (kan ha garanti-timmar)
   const contractRow = document.getElementById('editPersonContractRow');
   const contractInput = document.getElementById('editPersonContract');
-  if (type === 'TIM' || type === 'EXT') {
-    // Flex — kontrakt = 0
-    contractInput.value = 0;
-    contractRow.style.opacity = '0.4';
+  if (type === 'HEL') {
+    contractInput.value = 40;
+    contractRow.style.opacity = '0.55';
     contractInput.disabled = true;
-  } else {
+  } else if (type === 'TIM') {
+    contractInput.value = 0;
+    contractRow.style.opacity = '0.55';
+    contractInput.disabled = true;
+  } else if (type === 'DEL') {
     contractRow.style.opacity = '1';
     contractInput.disabled = false;
-    if (type === 'HEL' && (parseFloat(contractInput.value) || 0) === 0) {
-      contractInput.value = 40;
-    } else if (type === 'DEL' && (parseFloat(contractInput.value) || 0) === 0) {
-      contractInput.value = 25;
-    }
+    if ((parseFloat(contractInput.value) || 0) === 0) contractInput.value = 25;
+  } else if (type === 'EXT') {
+    contractRow.style.opacity = '1';
+    contractInput.disabled = false;
+    // EXT-default är 0 — användaren får höja om garantitimmar finns
   }
   epUpdateCostPreview();
 }
@@ -10200,7 +10207,21 @@ function saveEditPerson() {
 
   const { dept, type, wageType } = epGetCurrentSelection();
   let contract = parseFloat(document.getElementById('editPersonContract').value) || 0;
-  if (type === 'TIM' || type === 'EXT') contract = 0;
+  // Kontrakt-regler:
+  // HEL → låst på 40 (heltid är heltid)
+  // TIM → låst på 0 (timanställd har inget fast)
+  // DEL → måste anges (krav: > 0)
+  // EXT → 0 eller högre (garanti-timmar är frivilligt)
+  if (type === 'HEL') contract = 40;
+  else if (type === 'TIM') contract = 0;
+  else if (type === 'DEL' && contract <= 0) {
+    showAlert({
+      title: 'Kontrakt-timmar krävs',
+      message: 'Deltidsanställda måste ha kontrakt-timmar angivna (t.ex. 25 eller 30). Ändra till TIM/EXT om kontrakt saknas.',
+      type: 'warn',
+    });
+    return;
+  }
   const wage = parseFloat(document.getElementById('editPersonWage').value) || 0;
   const exception = document.getElementById('editPersonException').checked;
   const canWorkAlone = document.getElementById('editPersonCanWorkAlone').checked;
