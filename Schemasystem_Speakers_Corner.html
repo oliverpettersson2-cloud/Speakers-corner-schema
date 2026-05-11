@@ -14932,8 +14932,15 @@ function generateSchedulesForPeriod() {
           return true;
         };
 
-        // === Strategi 1: Försök föreslagen person först ===
-        if (suggestedEmp && isAvailable(suggestedEmp)) {
+        // === Strategi 1: HEL som inte fyllt 100% av kontrakt ===
+        // HEL PRIORITERAS ALLTID — heltid är heltid. Mall-suggestion respekteras
+        // bara om den är HEL eller alla HEL redan fyllda.
+        let candidates = employees.filter(e => e.type === 'HEL' && e.contract > 0);
+        candidates = candidates.filter(e => (weeklyHoursTracker[weekIdx][e.initials] || 0) < e.contract);
+        let pool = candidates.filter(isAvailable);
+
+        // Mall-favorit: om suggestedEmp är en HEL i poolen, ge dem prioritet
+        if (suggestedEmp && suggestedEmp.type === 'HEL' && pool.includes(suggestedEmp)) {
           const newShift = { i: suggestedEmp.initials, s: templateSlot.s, e: templateSlot.e };
           if (templateSlot.tag) newShift.tag = templateSlot.tag;
           weekShifts[dayIdx].push(newShift);
@@ -14941,10 +14948,6 @@ function generateSchedulesForPeriod() {
           return;
         }
 
-        // === Strategi 2: HEL som inte fyllt 100% ===
-        let candidates = employees.filter(e => e.type === 'HEL' && e.contract > 0);
-        candidates = candidates.filter(e => (weeklyHoursTracker[weekIdx][e.initials] || 0) < e.contract);
-        let pool = candidates.filter(isAvailable);
         if (pool.length > 0) {
           pool.sort((a,b) => {
             const gapA = a.contract - (weeklyHoursTracker[weekIdx][a.initials] || 0);
@@ -14952,8 +14955,6 @@ function generateSchedulesForPeriod() {
             const prefA = calcPreferenceScore(a, templateSlot, dayIdx, weekShifts, weekIdx, weeklyShifts);
             const prefB = calcPreferenceScore(b, templateSlot, dayIdx, weekShifts, weekIdx, weeklyShifts);
             // Soft-points: pref-skillnad väger mer än timgap-skillnad
-            // gap (timmar) brukar vara 5-40, prefScore brukar vara -8 till +5
-            // Vi skalar upp pref-poäng × 2 så de är jämbördiga
             return (gapB + prefB * 2) - (gapA + prefA * 2);
           });
           const picked = pool[0];
@@ -14961,6 +14962,16 @@ function generateSchedulesForPeriod() {
           if (templateSlot.tag) newShift.tag = templateSlot.tag;
           weekShifts[dayIdx].push(newShift);
           weeklyHoursTracker[weekIdx][picked.initials] = (weeklyHoursTracker[weekIdx][picked.initials] || 0) + passHours;
+          return;
+        }
+
+        // === Strategi 1b: Mall-suggestion när inga HEL behöver fyllas ===
+        // Om suggestedEmp är DEL/TIM/EXT och alla HEL redan fyllda → respektera mallen
+        if (suggestedEmp && suggestedEmp.type !== 'HEL' && isAvailable(suggestedEmp)) {
+          const newShift = { i: suggestedEmp.initials, s: templateSlot.s, e: templateSlot.e };
+          if (templateSlot.tag) newShift.tag = templateSlot.tag;
+          weekShifts[dayIdx].push(newShift);
+          weeklyHoursTracker[weekIdx][suggestedEmp.initials] = (weeklyHoursTracker[weekIdx][suggestedEmp.initials] || 0) + passHours;
           return;
         }
 
